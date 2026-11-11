@@ -1,4 +1,4 @@
-"""Abre o app desktop:  python main.py"""
+"""Personal Library. Abre o app desktop:  python main.py"""
 import sys
 
 

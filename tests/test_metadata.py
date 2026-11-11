@@ -107,3 +107,60 @@ def test_reader_roundtrip_matches_pypdf(make_pdf, tmp_path):
     pdf = make_pdf(tmp_path / "x.pdf", title="T", author="A B")
     reader = PdfReader(io.BytesIO(pdf.read_bytes()))
     assert len(reader.pages) == 1
+
+
+def test_volume_in_file_name_beats_pdf_title(make_pdf, tmp_path):
+    """O PDF diz só 'One Punch Man'; o volume do nome do arquivo não pode se perder."""
+    pdf = make_pdf(tmp_path / "One Punch Man - Vol 18.pdf", title="One Punch Man", author="ONE")
+    entry = metadata.build_entry(pdf, Options())
+    assert entry.title == "One Punch Man"
+    assert (entry.series, entry.series_index) == ("One Punch Man", 18)
+    assert entry.author == "ONE"  # o PDF completa o autor que o nome não trazia
+
+
+def test_user_pattern_is_used_and_wins(make_pdf, tmp_path):
+    pdf = make_pdf(tmp_path / "Naruto - 03 - Masashi Kishimoto.pdf", title="Outro Título",
+                   author="Outro Autor")
+    entry = metadata.build_entry(pdf, Options(filename_pattern="@name - @vol - @auth"))
+    assert (entry.title, entry.author) == ("Naruto", "Masashi Kishimoto")
+    assert entry.series_index == 3
+    assert entry.status is Status.READY
+
+
+def test_file_outside_the_pattern_is_flagged(make_pdf, tmp_path):
+    pdf = make_pdf(tmp_path / "Machado de Assis - Dom Casmurro.pdf")  # sem volume
+    entry = metadata.build_entry(pdf, Options(filename_pattern="@name - @vol - @auth"))
+    assert entry.status is Status.WARNING
+    assert any("fora do padrão" in note for note in entry.notes)
+    assert entry.title == "Dom Casmurro"  # caiu no modo automático
+
+
+def test_invalid_pattern_falls_back_to_automatic(make_pdf, tmp_path):
+    pdf = make_pdf(tmp_path / "Machado de Assis - Dom Casmurro.pdf")
+    entry = metadata.build_entry(pdf, Options(filename_pattern="@vol - @auth"))
+    assert entry.title == "Dom Casmurro"
+
+
+def test_fixed_values_override_pdf_and_file_name(make_pdf, tmp_path):
+    pdf = make_pdf(tmp_path / "One Punch Man - Vol 18 - Fulano.pdf", title="OPM",
+                   author="Outro Autor")
+    options = Options(filename_pattern="@name - @vol - @auth=ONE; @tags=mangá; "
+                                       "@publisher=Panini; @lang=pt")
+    entry = metadata.build_entry(pdf, options)
+    assert (entry.title, entry.author, entry.author_origin) == ("One Punch Man", "ONE", "fixo")
+    assert (entry.publisher, entry.language, entry.tags) == ("Panini", "pt", ["mangá"])
+    assert entry.status is Status.READY
+
+
+def test_fixed_author_avoids_unknown(make_pdf, tmp_path):
+    pdf = make_pdf(tmp_path / "apostila de fisica.pdf")
+    entry = metadata.build_entry(pdf, Options(filename_pattern="@auth=Prof. Silva"))
+    assert entry.author == "Prof. Silva" and entry.status is Status.READY
+
+
+def test_volume_in_author_or_title_is_flagged(make_pdf, tmp_path):
+    pdf = make_pdf(tmp_path / "One Punch Man - Vol 01.pdf")
+    entry = metadata.build_entry(pdf, Options(filename_pattern="@name - @auth"))
+    assert (entry.title, entry.author) == ("One Punch Man", "Vol 01")
+    assert entry.status is Status.WARNING
+    assert any("parece um volume" in note for note in entry.notes)

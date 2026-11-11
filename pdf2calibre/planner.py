@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -10,6 +11,7 @@ from typing import Callable, Iterable
 
 from .metadata import build_entry, sha256_file
 from .models import USABLE_STATUSES, BookEntry, Options, Status
+from .library import fold
 from .naming import book_stem, natural_key, sanitize_component
 
 ProgressFn = Callable[[int, int, str], None]
@@ -103,18 +105,35 @@ def mark_duplicates(entries: list[BookEntry], options: Options) -> int:
             else:
                 entry.note(message)
 
-    by_key: dict[tuple[str, str], BookEntry] = {}
+    by_key: dict[tuple, BookEntry] = {}
     for entry in entries:  # na ordem original, só os que ficaram
         if id(entry) not in survivors:
             continue
-        key = (entry.author.casefold(), entry.title.casefold())
+        key = book_key(entry.title, entry.authors or [entry.author], entry.series,
+                       entry.series_index)
         other = by_key.get(key)
         if other is not None:
             entry.status = Status.WARNING
-            entry.note(f"mesmo título e autor de {other.source.name} (arquivo diferente)")
+            entry.note(f"mesmo título, autor e volume de {other.source.name} "
+                       "(arquivo diferente)")
         else:
             by_key[key] = entry
     return duplicates
+
+
+def book_key(title: str, authors: list[str], series: str = "",
+             series_index: float | None = None) -> tuple:
+    """Identidade de um livro: título + autores + série + volume (sem caixa e acentos).
+
+    Volumes de uma coleção têm o mesmo título e autor ("One Punch Man", ONE) e só se
+    diferenciam pelo número, então o volume precisa entrar na comparação.
+    """
+    def norm(text: str) -> str:
+        return fold(re.sub(r"[\W_]+", " ", text or "")).strip()
+
+    volume = series_index if series and series_index is not None else None
+    return (norm(title), tuple(sorted(norm(a) for a in authors if a.strip())),
+            norm(series) if volume is not None else "", volume)
 
 
 def _same_content(path: Path, entry: BookEntry) -> bool:
@@ -170,6 +189,18 @@ def assign_targets(entries: list[BookEntry], dest_root: Path, options: Options) 
             continue
         taken.add(str(target).casefold())
         entry.target_dir, entry.target_file = target.parent, target
+
+
+def sidecar_paths(target: Path, folder_per_book: bool) -> tuple[Path, Path]:
+    """Caminhos do OPF e da capa de um livro: (opf, capa).
+
+    O OPF sempre tem o mesmo nome do PDF ('Título - Autor.opf'): é o único nome
+    que o Calibre procura quando adiciona o arquivo solto (Adicionar livros,
+    arrastar, adição automática, `calibredb add`). Ao adicionar a pasta ele
+    aceita qualquer .opf, então esse nome serve para todos os casos.
+    """
+    cover = target.parent / "cover.jpg" if folder_per_book else target.with_suffix(".jpg")
+    return target.with_suffix(".opf"), cover
 
 
 def summarize(entries: Iterable[BookEntry]) -> Counter:

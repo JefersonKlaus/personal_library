@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .models import BookEntry, Options, Status
-from .naming import normalize_text, parse_filename, split_authors
+from .naming import (PatternError, apply_spec, compile_spec, looks_like_volume,
+                     normalize_text, split_authors)
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +122,23 @@ def read_pdf_info(path: Path) -> PdfInfo:
 def build_entry(path: Path, options: Options) -> BookEntry:
     """Analisa um PDF e devolve o BookEntry com título e autor escolhidos."""
     entry = BookEntry(source=path)
-    parsed = parse_filename(path.stem, options.author_first)
+    try:
+        spec = compile_spec(options.filename_pattern)
+    except PatternError:  # a interface valida antes; aqui só não pode quebrar
+        spec = None
+    parsed, matched = apply_spec(path.stem, spec, options.author_first)
+    if not matched:
+        entry.note(f"nome fora do padrão '{spec.text}'")
+    fixed = spec.fixed if spec is not None else {}
     entry.title, entry.author, entry.year = parsed.title, parsed.author, parsed.year
+    entry.series, entry.series_index = parsed.series, parsed.series_index
+    entry.publisher, entry.tags = parsed.publisher, parsed.tags
+    if fixed.keys() & {"title", "volume", "series"}:
+        entry.title_origin = "fixo"
+    # O nome do arquivo manda quando segue o padrão do usuário, traz o volume ou tem
+    # valor fixo: o título de dentro do PDF ("One Punch Man") perderia o "Vol 18".
+    filename_wins = (spec is not None and spec.has_pattern and matched) \
+        or parsed.series_index is not None or entry.title_origin == "fixo"
 
     try:
         entry.size = path.stat().st_size
@@ -148,13 +164,25 @@ def build_entry(path: Path, options: Options) -> BookEntry:
 
     pdf_title = info.title if info.title and not is_junk_title(info.title) else ""
     pdf_author = info.author if info.author and not is_junk_author(info.author) else ""
-    if options.prefer_pdf_metadata:
+    if options.prefer_pdf_metadata and not filename_wins:
         if pdf_title:
             entry.title, entry.title_origin = pdf_title, "pdf"
         if pdf_author:
             entry.author, entry.author_origin = pdf_author, "pdf"
-    elif not entry.author and pdf_author:
+    elif not entry.author and pdf_author:  # o PDF só completa o que faltou
         entry.author, entry.author_origin = pdf_author, "pdf"
+    # Valores fixos ("@auth=ONE") valem para todos os arquivos e vencem tudo.
+    if "author" in fixed:
+        entry.author, entry.author_origin = fixed["author"], "fixo"
+    if parsed.language:
+        entry.language = parsed.language
+    # "@name - @auth" em "One Punch Man - Vol 01" põe "Vol 01" no autor: avisa.
+    for label, value in (("autor", entry.author), ("título", entry.title)):
+        if looks_like_volume(value):
+            entry.note(f"o {label} '{value}' parece um volume: confira o padrão (use @vol)")
+    if any(note.startswith(("nome fora do padrão", "o autor", "o título"))
+           for note in entry.notes) and entry.status is Status.READY:
+        entry.status = Status.WARNING
 
     names = split_authors(entry.author)
     if names:

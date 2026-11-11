@@ -38,6 +38,10 @@ class BookEntry:
     title: str = ""
     author: str = ""
     year: int | None = None
+    series: str = ""
+    series_index: float | None = None  # número do volume na série
+    publisher: str = ""
+    tags: list[str] = field(default_factory=list)  # do nome do arquivo ou @tags=...
     language: str | None = None
     pages: int = 0
     size: int = 0
@@ -84,7 +88,8 @@ class Options:
     skip_duplicates: bool = True
     verify_hash: bool = True
     prefer_pdf_metadata: bool = True
-    author_first: bool = True  # "Autor - Título" no nome do arquivo
+    author_first: bool = True  # "Autor - Título" no nome do arquivo (modo automático)
+    filename_pattern: str = ""  # "Como importar": "@name - @vol; @auth=ONE"; vazio = automático
     unknown_author: str = "Unknown"
     tags: list[str] = field(default_factory=list)
     max_name_length: int = 80
@@ -108,6 +113,8 @@ class Options:
                 del clean["mode"]
         if "tags" in clean and not isinstance(clean["tags"], list):
             del clean["tags"]
+        if "filename_pattern" in clean and not isinstance(clean["filename_pattern"], str):
+            del clean["filename_pattern"]
         return cls(**clean)
 
 

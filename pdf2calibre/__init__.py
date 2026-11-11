@@ -1,3 +1,4 @@
-"""PDF -> Calibre: organiza lotes de PDFs para importar no Calibre."""
+"""Personal Library: importa PDFs para a biblioteca do Calibre, mostra a galeria e exporta."""
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
+APP_NAME = "Personal Library"

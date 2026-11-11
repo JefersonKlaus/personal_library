@@ -26,7 +26,7 @@ def test_copy_creates_book_and_opf(tmp_path, make_pdf, options):
     assert target.is_file()
     assert entries[0].source.is_file()  # copiar mantém a origem
     assert entries[0].status is Status.DONE
-    opf = ET.parse(target.parent / "metadata.opf").getroot()
+    opf = ET.parse(target.with_suffix(".opf")).getroot()  # nome que o Calibre procura
     assert opf.tag.endswith("package")
     assert report.manifest and report.manifest.is_file()
     assert not list(dest.rglob("*.part"))
@@ -158,3 +158,48 @@ def test_skipped_counts_unusable_entries(tmp_path, make_pdf, options):
     report = organizer.organize(entries, dest, options)
     assert report.skipped == 1 and report.total == 0
     assert report.summary().startswith("0 de 0")
+
+
+def test_sidecars_exist_before_the_pdf_appears(tmp_path, make_pdf, monkeypatch):
+    """A adição automática do Calibre não pode ver o PDF sem o OPF ao lado."""
+    options = Options(workers=1, extract_cover=True)
+    entries, dest = _prepare(tmp_path, make_pdf, options)
+    seen = {}
+    real_replace = organizer.os.replace
+
+    def spy(src, dst):
+        if str(dst).endswith(".pdf"):
+            seen["opf"] = entries[0].target_file.with_suffix(".opf").is_file()
+        real_replace(src, dst)
+
+    monkeypatch.setattr(organizer.os, "replace", spy)
+    organizer.organize(entries, dest, options)
+    assert seen == {"opf": True}
+
+
+def test_sidecar_failure_leaves_nothing_behind(tmp_path, make_pdf, options, monkeypatch):
+    entries, dest = _prepare(tmp_path, make_pdf, options)
+
+    def broken(path, *_args, **_kwargs):
+        path.write_text("meio")
+        raise OSError("disco cheio")
+
+    monkeypatch.setattr(organizer, "write_opf", broken)
+    report = organizer.organize(entries, dest, options)
+    assert report.failed == 1 and report.manifest is None
+    assert not (dest / "Autor Um").exists()
+
+
+@pytest.mark.parametrize("inside", ["", "Sub/Pasta"])
+def test_refuses_destination_inside_calibre_library(tmp_path, make_pdf, options, inside):
+    entries, _dest = _prepare(tmp_path, make_pdf, options)
+    library = tmp_path / "Calibre Library"
+    library.mkdir()
+    (library / "metadata.db").write_bytes(b"")
+    dest = library / inside
+    planner.assign_targets(entries, dest, options)
+    for dry_run in (True, False):
+        options.dry_run = dry_run
+        with pytest.raises(organizer.OrganizerError, match="biblioteca do Calibre"):
+            organizer.organize(entries, dest, options)
+    assert not list(library.rglob("*.pdf"))

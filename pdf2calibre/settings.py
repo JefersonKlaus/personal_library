@@ -1,4 +1,4 @@
-"""Preferências do usuário salvas em ~/.pdf2calibre/settings.json."""
+"""Preferências do usuário salvas em ~/.pdf2calibre/settings.json (Personal Library)."""
 from __future__ import annotations
 
 import json
@@ -23,6 +23,10 @@ class Settings:
     library: str = ""
     calibredb: str = ""
     use_calibredb: bool = False
+    gallery_sort: str = "added"
+    export_folder_per_book: bool = True
+    export_opf: bool = True
+    export_cover: bool = True
     last_sources: list[str] = field(default_factory=list)
     options: dict[str, Any] = field(default_factory=dict)
 
@@ -42,10 +46,13 @@ def load_settings(path: Path = SETTINGS_FILE) -> Settings:
     if not isinstance(raw, dict):
         return Settings()
     settings = Settings()
-    for key in ("destination", "library", "calibredb"):
+    for key in ("destination", "library", "calibredb", "gallery_sort"):
         if isinstance(raw.get(key), str):
             setattr(settings, key, raw[key])
     settings.use_calibredb = bool(raw.get("use_calibredb", False))
+    for key in ("export_folder_per_book", "export_opf", "export_cover"):
+        if isinstance(raw.get(key), bool):
+            setattr(settings, key, raw[key])
     sources = raw.get("last_sources")
     if isinstance(sources, list):
         settings.last_sources = [item for item in sources if isinstance(item, str)]

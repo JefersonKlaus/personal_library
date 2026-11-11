@@ -1,13 +1,13 @@
-# PDF → Calibre
+# Personal Library
 
-App desktop (Python + Flet) que recebe um lote de PDFs e os organiza para o Calibre:
+App desktop (Python + Flet) para cuidar da sua biblioteca de PDFs no Calibre:
 
-1. Lê título e autor de dentro do PDF (e, se faltar ou estiver lixo, do nome do arquivo).
-2. Detecta arquivos idênticos e mantém a cópia com melhores metadados.
-3. Você revisa e corrige título/autor numa lista.
-4. Cria `Autor/Título/Título - Autor.pdf` com `metadata.opf` (e capa, se quiser).
-5. Opcionalmente importa direto na biblioteca com `calibredb`.
-6. Tudo pode ser **simulado** antes e **desfeito** depois.
+1. **Importar**: escolha PDFs; título e autor são lidos e ajustados automaticamente
+   (metadados de dentro do PDF, nome do arquivo, lixo como "Microsoft Word - doc1" ou
+   "admin" é descartado, arquivos idênticos são detectados). Você confere e importa para a
+   sua biblioteca do Calibre.
+2. **Galeria**: a biblioteca do Calibre em grade de capas, com busca e detalhes.
+3. **Exportar**: copia livros da biblioteca para outra pasta, no formato do Calibre.
 
 ## Instalar e abrir
 
@@ -18,25 +18,164 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Para extrair capas: `pip install pypdfium2 Pillow`.
+Precisa do [Calibre](https://calibre-ebook.com) instalado (o app usa o `calibredb` dele para
+importar). As miniaturas da galeria ficam em cache em `~/.pdf2calibre/thumbs`.
 
 ## Como usar
 
-1. **Origem:** adicione PDFs, uma pasta, ou cole o caminho.
-2. **Destino:** escolha onde criar a biblioteca organizada (pasta nova de preferência).
-3. Clique em **Analisar**, revise título/autor e desmarque o que não quer.
-4. **Simular** mostra o que seria feito sem tocar no disco. **Organizar** executa.
-5. No Calibre: *Adicionar livros → de pastas (um livro por pasta)* e aponte para o destino.
-   Ou marque a opção de importar com `calibredb` (feche o Calibre antes).
-6. Errou? **Desfazer última** apaga as cópias (ou devolve os arquivos movidos).
+### 1. Importar
+
+1. **Adicionar PDFs…**, **Adicionar pasta…** ou cole um caminho. A análise começa sozinha.
+2. Se os arquivos seguem um formato, descreva-o em **Como importar** (ou escolha em
+   **Modelos**) e clique em **Aplicar**: parâmetros (`@name`, `@vol`, `@auth`...), os
+   delimitadores entre eles e valores fixos para todos os PDFs (`@auth=ONE`). A linha de
+   exemplo mostra como o primeiro arquivo será lido. Vazio = automático.
+3. Confira título, autor, série e volume na lista (edite o que precisar; desmarque o que não
+   quer). Vários autores: separe com `&`.
+4. Opcional: etiquetas para todos os livros (ex.: `importado`).
+5. **Importar para a biblioteca**: os livros vão para a biblioteca escolhida na aba Galeria,
+   com título, autores, ano, idioma, etiquetas e capa (1ª página). Livros que a biblioteca
+   já tem (mesmo título e autor) são avisados e não são duplicados.
+6. **Desfazer última importação** remove esses livros (eles vão para a lixeira do Calibre).
+
+> **Feche o Calibre antes de importar**: com ele aberto o `calibredb` recusa o acesso.
+
+#### Qual biblioteca recebe os livros
+
+Se nenhuma biblioteca foi escolhida ainda (ou a escolhida foi apagada/movida), o item 3 mostra
+um aviso com as opções:
+
+- **Usar esta**: bibliotecas que o seu Calibre já conhece aparecem listadas (o app lê a
+  configuração do Calibre: biblioteca atual e usadas recentemente, e a pasta padrão
+  `Calibre Library` na sua pasta de usuário);
+- **Escolher biblioteca existente…**: a pasta que tem o `metadata.db` (escolher a pasta de
+  cima, como `Documentos`, também funciona se houver uma só biblioteca dentro dela);
+- **Criar biblioteca nova…**: escolha onde; se a pasta não estiver vazia, a biblioteca é
+  criada numa subpasta `Calibre Library`. Quem cria é o próprio Calibre (`calibredb`), então
+  o Calibre precisa estar instalado e fechado. Para abri-la depois no Calibre: botão
+  **Biblioteca > Alternar/criar biblioteca** e escolha a pasta.
+
+Com uma biblioteca escolhida, **Trocar biblioteca…** mostra as mesmas opções. A biblioteca
+é a mesma nas três abas (Importar, Galeria e Exportar); a Galeria também tem **Criar nova…**.
+
+#### Como importar: parâmetros, delimitadores e valores fixos
+
+Escreva os parâmetros na ordem em que aparecem no nome do arquivo, com os delimitadores
+usados entre eles (`-`, `_`, espaço, parênteses...):
+
+| Parâmetro    | Significa                                     | Também aceito                |
+|--------------|-----------------------------------------------|------------------------------|
+| `@name`      | título da obra                                | `@nome`, `@title`, `@titulo` |
+| `@vol`       | volume: `Vol 18`, `Volume 41`, `v03`, `03`    | `@volume`                    |
+| `@auth`      | autor(es)                                     | `@autor`, `@author`          |
+| `@year`      | ano: `1999` ou `(1999)`                       | `@ano`                       |
+| `@series`    | série, quando diferente do `@name`            | `@serie`                     |
+| `@publisher` | editora                                       | `@editora`                   |
+| `@lang`      | idioma (`pt`, `por`, `en`...)                 | `@idioma`                    |
+| `@tags`      | etiquetas, separadas por vírgula              | `@etiquetas`                 |
+| `@skip`      | parte a ignorar                               | `@ignorar`                   |
+
+**Valor fixo** (vale para todos os PDFs e vence o nome do arquivo e os metadados do PDF):
+`@parâmetro=valor`, no fim do padrão ou separado por `;`.
+
+| Como importar                                        | `One Punch Man - Vol 18` vira                                   |
+|------------------------------------------------------|-----------------------------------------------------------------|
+| `@name - @vol - @auth`                               | título `One Punch Man`, vol. 18, série `One Punch Man`           |
+| `@name - @vol; @auth=ONE`                            | idem, autor **ONE** em todos                                     |
+| `@name - @vol - @auth=ONE`                           | idem; se o arquivo tiver uma 3ª parte, ela é trocada por ONE     |
+| `@name - @vol; @series=Coleção OPM`                  | título `One Punch Man`, vol. 18, série `Coleção OPM`             |
+| `@name - @vol; @auth=ONE; @tags=mangá; @publisher=Panini; @lang=pt` | idem, com etiqueta, editora e idioma            |
+| `@auth=ONE` (sem padrão)                             | modo automático, só o autor fixo                                 |
+| `@vol; @name=One Punch Man` (arquivos `01.pdf`, `02.pdf`...) | título fixo e volume do nome do arquivo                 |
+
+Outros exemplos: `@auth - @name (@year)` lê `Machado de Assis - Dom Casmurro (1899)`;
+`@series - @vol - @name` lê `Harry Potter - 1 - A Pedra Filosofal`;
+`@skip - @name - @auth` ignora o `[Grupo]` de `[Grupo] - Iracema - José de Alencar`.
+Partes que faltam no fim do nome ficam vazias. Arquivos fora do padrão ficam com **atenção**
+e são lidos no modo automático (os valores fixos continuam valendo). Quando há padrão, o
+nome do arquivo vale mais que os metadados de dentro do PDF, que só completam o que faltar.
+O formato antigo (`NOME - VOL - AUTOR`) continua aceito.
+
+**Cada parâmetro preenche só o seu campo**: `@name` é o título (exatamente), `@vol` é o
+volume, `@auth` o autor, `@series` a série. Se o padrão põe algo como `Vol 01` no autor ou no
+título (ex.: `@name - @auth` em `One Punch Man - Vol 01`), o livro fica com **atenção** e a
+linha de exemplo avisa "parece um volume: use @vol".
+
+**Volumes e série**: o Calibre só guarda o número do volume dentro de uma série (sem série
+ele descarta o número). Por isso, quando há `@vol` e não há `@series`, a série é o próprio
+`@name`, e a linha de exemplo mostra isso ("Série: One Punch Man (de @name)"). Para outra
+série, use `@series` no padrão ou `@series=...`.
+
+**Duplicados**: o Calibre considera duplicados livros com o mesmo título e autor, e
+recusaria o volume 2 de "One Punch Man". Para volumes, o app compara título + autor + série +
+volume com a biblioteca antes de importar (o mesmo volume de novo aparece como "já existe") e
+manda o resto para o Calibre aceitar. Na Galeria cada capa mostra o volume, e ordenar por
+**Título** ou **Série e volume** põe os volumes em ordem. Ao exportar, volumes com o mesmo
+título e autor ganham o volume no nome do arquivo (`One Punch Man - Vol. 18 - ONE.pdf`).
+
+O modo automático (campo vazio) também reconhece volumes (`Vol 18`, `Volume 41`, `v03`,
+`- 03`) e segue as mesmas regras.
+
+### 2. Galeria
+
+Escolha a pasta da biblioteca do Calibre (a que tem `metadata.db`). Os livros aparecem em
+grade de capas como no Calibre: busca por título, autor, etiqueta, série ou editora (sem
+diferenciar acentos), ordem (mais recentes, título, série e volume, autor, publicação) e, ao
+clicar, os
+detalhes do livro com botões para abrir o PDF ou a pasta. A galeria **só lê** a biblioteca
+(banco aberto em modo somente leitura) e funciona com o Calibre aberto. Ela se atualiza
+sozinha depois de uma importação.
+
+### 3. Exportar
+
+Marque os livros da biblioteca (todos vêm marcados; o filtro e "Marcar/Desmarcar todos"
+ajudam a escolher), escolha a pasta de destino e clique em **Exportar**. Cada livro vira:
+
+```
+Autor/Título/Título - Autor.pdf     (e os outros formatos que o livro tiver)
+Autor/Título/Título - Autor.opf     todos os metadados: série, editora, ISBN, descrição...
+Autor/Título/cover.jpg
+```
+
+**Simular** mostra o que seria feito sem tocar no disco; **Desfazer última** apaga a
+exportação. A pasta exportada entra em qualquer Calibre com *Adicionar livros → Adicionar
+de pastas e subpastas*, arrastando os PDFs ou pela pasta de adição automática (nesse caso
+desmarque "Uma pasta por livro", porque o Calibre não olha subpastas).
+
+> O destino não pode ser uma biblioteca do Calibre: ele só mostra livros registrados no
+> `metadata.db`, e arquivos copiados direto para lá ficariam invisíveis. Para colocar livros
+> numa biblioteca, use a aba Importar.
+
+A barra de baixo mostra o progresso, o botão **Cancelar** e a última mensagem; **Registro**
+abre o histórico (ele abre sozinho quando há erro).
+
+## Como o Calibre lê os metadados
+
+Regras conferidas no código do Calibre (`calibre/ebooks/metadata/meta.py` e `opf2.py`):
+
+- O Calibre só usa um `.opf` que tenha `<dc:identifier opf:scheme="calibre">`. Sem isso, ele
+  ignora o arquivo e usa o que está dentro do PDF ("Microsoft Word - doc1", "admin"...).
+- Para um PDF adicionado sozinho, ele só procura o `.opf` **com o mesmo nome** do PDF.
+  Por isso o app grava `Título - Autor.opf`, e não `metadata.opf`.
+- O ano vai como `AAAA-01-01T12:00:00+00:00`: com meia-noite UTC o Calibre mostraria
+  dezembro do ano anterior em fusos como o do Brasil.
+- O `opf:file-as` de todos os autores leva a ordenação do livro inteiro
+  (`Lima, Ana & Dias, Rui`), que é como o Calibre grava e lê.
+- O `calibredb` é chamado com `CALIBRE_OVERRIDE_LANG=en`, para o app entender a resposta
+  mesmo com o Calibre em português.
+- Importar passa por uma pasta temporária (PDF + `.opf` + capa) e `calibredb add`; a pasta
+  temporária é apagada no fim, mesmo se der erro.
 
 ## Segurança dos arquivos
 
-- A cópia é gravada como `.part`, verificada (tamanho e SHA-256) e só então renomeada.
-- No modo *mover*, o original só é apagado depois dessa verificação.
-- O desfazer nunca sobrescreve um arquivo que já exista na origem.
+- Os PDFs de origem nunca são alterados nem apagados.
+- Cópias são gravadas como `.part`, verificadas (tamanho e SHA-256) e só então renomeadas;
+  o `.opf` e a capa são gravados antes, para o livro nunca aparecer sem eles.
+- A biblioteca do Calibre só é alterada pelo próprio Calibre (`calibredb`); o app apenas lê
+  o `metadata.db`.
+- Desfazer nunca sobrescreve arquivos; importações desfeitas vão para a lixeira do Calibre.
 - Se o disco não tiver espaço para o lote, nada é copiado.
-- Nenhum PDF é aberto fora do seu computador; não há rede nem telemetria.
+- Nenhum PDF sai do seu computador; não há rede nem telemetria.
 
 ## Estrutura
 
@@ -46,12 +185,16 @@ pdf2calibre/
   models.py              BookEntry, Options, Report...
   naming.py              nomes de arquivo -> título/autor; nomes seguros
   metadata.py            leitura de PDF (pypdf) e montagem do BookEntry
-  planner.py             achar PDFs, duplicados, destinos
-  organizer.py           copiar/mover, OPF, capa, desfazer
-  opf.py / cover.py      metadata.opf e capa
-  calibre.py             integração com calibredb
+  planner.py             achar PDFs, duplicados, caminhos
+  organizer.py           cópia verificada, OPF, capa, desfazer
+  opf.py / cover.py      arquivo .opf e capa
+  calibre.py             integração com calibredb (add, remove)
+  library_import.py      aba Importar: PDFs revisados -> biblioteca (calibredb)
+  library.py             leitura somente leitura da biblioteca do Calibre
+  exporter.py            aba Exportar: biblioteca -> pasta no formato do Calibre
   settings.py            preferências em ~/.pdf2calibre/settings.json
-  ui.py                  interface Flet
+  ui.py                  janela e abas Importar/Exportar (Flet)
+  gallery_ui.py          aba Galeria (grade de capas, busca, detalhes)
 tests/                   pytest (lógica + ligação da interface)
 ```
 
@@ -67,6 +210,7 @@ aparência nem a compatibilidade com a versão instalada do Flet. Abra o app e t
 
 ## Limites conhecidos
 
-- A leitura de autor pelo nome do arquivo é uma heurística: confira a lista antes de organizar.
+- A leitura de autor pelo nome do arquivo é uma heurística: confira a lista antes de importar.
 - Listas de autores separadas só por vírgula (`Silva, Souza, Lima`) não são divididas; use `&`.
-- O `calibredb` recusa trabalhar com a biblioteca aberta no Calibre.
+- O `calibredb` recusa trabalhar com a biblioteca aberta no Calibre (feche-o para importar).
+- A galeria mostra 60 livros por página e não edita a biblioteca (isso fica com o Calibre).

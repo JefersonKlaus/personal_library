@@ -147,3 +147,23 @@ def test_summarize_counts_by_status(make_pdf, tmp_path, options):
     counts = planner.summarize(_scan(tmp_path, options))
     assert counts[Status.READY] == 1
     assert counts[Status.ERROR] == 1
+
+
+def test_volumes_with_same_title_are_not_duplicates(tmp_path, make_pdf):
+    src = tmp_path / "opm"
+    for number in (1, 2, 18):
+        make_pdf(src / f"One Punch Man - Vol {number}.pdf", text=str(number))
+    options = Options(workers=1, filename_pattern="@name - @vol; @auth=ONE")
+    entries = planner.build_entries(planner.find_pdfs([src]), options)
+    planner.mark_duplicates(entries, options)
+    assert {e.title for e in entries} == {"One Punch Man"}
+    assert all(e.status is Status.READY for e in entries)  # volumes diferentes
+    assert not any("mesmo título" in note for e in entries for note in e.notes)
+
+
+def test_book_key_compares_volume_and_ignores_case_and_accents():
+    key = planner.book_key
+    assert key("One Punch Man", ["ONE"], "One Punch Man", 1) != \
+        key("One Punch Man", ["ONE"], "One Punch Man", 2)
+    assert key("O Cortiço", ["Aluísio Azevedo"]) == key("o cortico", ["ALUISIO AZEVEDO"])
+    assert key("Dom Casmurro", ["A", "B"]) == key("Dom Casmurro", ["B", "A"])

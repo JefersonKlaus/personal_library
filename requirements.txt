@@ -1,5 +1,5 @@
 flet>=1.0
 pypdf>=4.0
-# Opcionais (só para extrair a capa da primeira página):
-# pypdfium2
-# Pillow
+# Capa da 1ª página ao importar e miniaturas da galeria:
+pypdfium2
+Pillow

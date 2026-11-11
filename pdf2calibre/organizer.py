@@ -11,10 +11,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from .calibre import find_library_root
 from .cover import extract_cover
 from .metadata import sha256_file
 from .models import BookEntry, Mode, OperationRecord, Options, Report, Status
 from .opf import write_opf
+from .planner import sidecar_paths
 
 logger = logging.getLogger(__name__)
 
@@ -62,14 +64,6 @@ def _verify(entry: BookEntry, copy_path: Path, options: Options) -> None:
         raise OrganizerError("hash diferente após copiar; o arquivo foi alterado ou corrompido")
 
 
-def _sidecar_paths(entry: BookEntry, options: Options) -> tuple[Path, Path]:
-    target = entry.target_file
-    assert target is not None
-    if options.folder_per_book:
-        return target.parent / "metadata.opf", target.parent / "cover.jpg"
-    return target.with_suffix(".opf"), target.with_suffix(".jpg")
-
-
 def _process(entry: BookEntry, options: Options) -> OperationRecord:
     """Copia (ou move) um livro e cria os arquivos auxiliares."""
     source, target = entry.source, entry.target_file
@@ -79,23 +73,27 @@ def _process(entry: BookEntry, options: Options) -> OperationRecord:
 
     created = _make_dirs(target.parent)
     temp = target.with_name(target.name + ".part")
+    opf_path, cover_path = sidecar_paths(target, options.folder_per_book)
+    sidecars: list[str] = []
     try:
         shutil.copy2(source, temp)
         _verify(entry, temp, options)
+        # Capa e OPF antes do PDF aparecer com o nome final: a adição automática
+        # do Calibre lê o livro ~2 s depois que ele surge na pasta e, sem o OPF
+        # ao lado, importaria os metadados "lixo" de dentro do PDF.
+        has_cover = options.extract_cover and extract_cover(temp, cover_path)
+        if has_cover:
+            sidecars.append(str(cover_path))
+        if options.write_opf:
+            sidecars.append(str(opf_path))  # antes de gravar: uma falha no meio também é limpa
+            write_opf(opf_path, entry, options.tags, cover_path.name if has_cover else None)
         os.replace(temp, target)
     except Exception:
         temp.unlink(missing_ok=True)
+        for sidecar in sidecars:
+            Path(sidecar).unlink(missing_ok=True)
         _remove_empty(created)
         raise
-
-    sidecars: list[str] = []
-    opf_path, cover_path = _sidecar_paths(entry, options)
-    has_cover = options.extract_cover and extract_cover(target, cover_path)
-    if has_cover:
-        sidecars.append(str(cover_path))
-    if options.write_opf:
-        write_opf(opf_path, entry, options.tags, cover_path.name if has_cover else None)
-        sidecars.append(str(opf_path))
 
     if options.mode is Mode.MOVE:
         source.unlink()  # só depois de copiar e verificar com sucesso
@@ -107,6 +105,14 @@ def organize(entries: list[BookEntry], dest_root: Path, options: Options,
              cancel: threading.Event | None = None) -> Report:
     """Organiza os livros prontos em `dest_root` e devolve um relatório."""
     dest_root = Path(dest_root)
+    library = find_library_root(dest_root)
+    if library is not None:
+        raise OrganizerError(
+            f"O destino fica dentro da biblioteca do Calibre ({library}). O Calibre só "
+            "conhece os livros registrados no metadata.db: arquivos copiados direto para "
+            "lá não aparecem e bagunçam a biblioteca. Escolha outra pasta e importe com "
+            "calibredb, 'Adicionar livros' ou a pasta de adição automática do Calibre."
+        )
     todo = [entry for entry in entries if entry.usable and entry.target_file]
     report = Report(total=len(todo), dry_run=options.dry_run,
                     skipped=len(entries) - len(todo))
