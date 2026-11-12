@@ -159,3 +159,14 @@ def test_title_sort_keeps_volumes_in_order():
     books = [database.LibraryBook(id=n, title="One Punch Man", series="One Punch Man",
                              series_index=float(n)) for n in (18, 2, 1)]
     assert [b.series_index for b in search.sort_books(books, "title")] == [1, 2, 18]
+
+
+def test_series_counts_and_filter():
+    books = [database.LibraryBook(id=1, title="A", series="Zeta"),
+             database.LibraryBook(id=2, title="B", series="álbum"),
+             database.LibraryBook(id=3, title="C", series="Zeta"),
+             database.LibraryBook(id=4, title="D")]
+    assert search.series_counts(books) == [("álbum", 1), ("Zeta", 2)]  # sem acento na ordem
+    assert [b.id for b in search.in_series(books, "Zeta")] == [1, 3]
+    assert [b.id for b in search.in_series(books, search.NO_SERIES)] == [4]
+    assert len(search.in_series(books, None)) == 4

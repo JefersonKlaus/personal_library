@@ -5,7 +5,7 @@ variáveis de ambiente, pastas de configuração e marcas do formato OPF. Esses
 valores são contrato do programa externo e não podem ser trocados.
 """
 
-PRODUCT = "Calibre"  # nome mostrado ao usuário ("feche o Calibre antes de importar")
+PRODUCT = "Calibre"  # nome mostrado ao usuário ("Calibre não encontrado: instale-o...")
 
 # Ferramenta de linha de comando
 CLI_NAME = "calibredb"

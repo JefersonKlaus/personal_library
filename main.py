@@ -1,4 +1,4 @@
-"""Personal Library. Abre o app desktop:  python main.py"""
+"""Personal Library. Abre o app:  flet run   (ou  python main.py)"""
 import sys
 
 
@@ -13,7 +13,9 @@ def run() -> int:
     from personal_library.ui.app import main
 
     setup_logging()
-    ft.run(main)
+    # no_cdn: no modo web (`flet run --web`) os arquivos do Flet saem do próprio app,
+    # sem buscar nada na internet; no desktop não muda nada.
+    ft.run(main, no_cdn=True)
     return 0
 
 

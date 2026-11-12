@@ -162,7 +162,7 @@ UI_MODULES = ("app", "import_tab", "gallery_tab", "export_tab", "library_picker"
               "widgets")
 ENUM_NAMES = {"Colors", "Icons", "FontWeight", "CrossAxisAlignment", "ScrollMode", "StackFit",
               "ThemeMode", "FilePickerFileType", "TextOverflow", "TextAlign", "BoxFit",
-              "Alignment", "MainAxisAlignment", "Border"}
+              "Alignment", "MainAxisAlignment", "Border", "VisualDensity"}
 
 
 class _Name(str):

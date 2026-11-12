@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import pytest
 
 from personal_library.library import cli
-from personal_library.library.manager import CLI_NAME, LANGUAGE_ENV, PRODUCT
+from personal_library.library.manager import CLI_NAME, LANGUAGE_ENV
 from personal_library.models import BookEntry
 
 POSIX_ONLY = pytest.mark.skipif(os.name == "nt", reason="usa um script shell falso")
@@ -75,7 +75,9 @@ def test_add_book_results(tmp_path):
     repeated = tool.add_book(tmp_path, book, _entry(title="Repetido"), [])
     assert repeated.duplicate and "já existe" in repeated.message
     broken = tool.add_book(tmp_path, book, _entry(title="Quebrado"), [])
-    assert not broken.ok and f"Feche o {PRODUCT}" in broken.message
+    # biblioteca em uso: explicação clara no lugar da saída técnica da ferramenta
+    assert not broken.ok and broken.message == cli.LIBRARY_IN_USE
+    assert "outro programa" in broken.message and "running" not in broken.message
     missing = cli.LibraryCli(tmp_path / "nao-existe").add_book(tmp_path, book, _entry(), [])
     assert not missing.ok and "não foi possível" in missing.message
 
@@ -122,5 +124,19 @@ def test_create_library(tmp_path):
     broken = cli.LibraryCli(_fake_tool(tmp_path / "quebrado", (
         "print('Another program is running', file=sys.stderr); sys.exit(1)\n")))
     ok, message = broken.create_library(tmp_path / "falha")
-    assert not ok and f"Feche o {PRODUCT}" in message
+    assert not ok and message == cli.LIBRARY_IN_USE
     assert not (tmp_path / "falha").exists()  # não deixa pasta vazia para trás
+
+
+@POSIX_ONLY
+def test_set_fields(tmp_path):
+    log = tmp_path / "args.txt"
+    tool = cli.LibraryCli(_fake_tool(tmp_path / "tool", (
+        f"open({str(log)!r}, 'w').write('|'.join(sys.argv[1:]))\n"
+        "sys.exit(1 if '999' in sys.argv else 0)\n")))
+    fields = {"title": "Spider-Geddon: Prólogo", "sort": "Spider-Geddon: Prólogo"}
+    assert tool.set_fields(tmp_path, 9, fields) == (True, "")
+    assert log.read_text() == (f"set_metadata|--with-library|{tmp_path}|"
+                               "--field=title:Spider-Geddon: Prólogo|"
+                               "--field=sort:Spider-Geddon: Prólogo|9")
+    assert tool.set_fields(tmp_path, 999, {"title": "x"})[0] is False

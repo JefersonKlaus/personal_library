@@ -11,12 +11,28 @@ App desktop (Python + Flet) para cuidar da sua biblioteca de PDFs no Calibre:
 
 ## Instalar e abrir
 
+Na pasta do projeto:
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate        # Windows   (Linux/macOS: source .venv/bin/activate)
 pip install -r requirements.txt
-python main.py
+flet run
 ```
+
+`flet run` abre o app na janela desktop (ele executa o `main.py` desta pasta). Outras formas:
+
+| Comando            | O que faz                                                           |
+|--------------------|---------------------------------------------------------------------|
+| `flet run`         | abre o app                                                          |
+| `flet run -r`      | abre e reinicia sozinho quando qualquer arquivo do código muda       |
+| `flet run --web`   | abre no navegador                                                   |
+| `python main.py`   | também abre o app, sem o comando `flet`                             |
+
+O `requirements.txt` instala o Flet com `cli` (o comando `flet`) e `desktop` (a janela); sem
+eles o Flet tentaria instalá-los sozinho na primeira execução. A configuração do projeto
+(nome, versão, dependências e `[tool.flet]`) está no `pyproject.toml`, e o `flet run` cria
+uma pasta `.flet/` local de trabalho, que o git já ignora.
 
 Precisa do [Calibre](https://calibre-ebook.com) instalado (o app usa o `calibredb` dele para
 importar). Preferências, registro e miniaturas da galeria ficam em `~/.personal_library`.
@@ -38,7 +54,9 @@ importar). Preferências, registro e miniaturas da galeria ficam em `~/.personal
    já tem (mesmo título e autor) são avisados e não são duplicados.
 6. **Desfazer última importação** remove esses livros (eles vão para a lixeira do Calibre).
 
-> **Feche o Calibre antes de importar**: com ele aberto o `calibredb` recusa o acesso.
+> **Se outro programa estiver usando a biblioteca** (por exemplo, o Calibre aberto ou um leitor
+> de e-books), **feche-o antes de importar**: enquanto isso, a ferramenta da biblioteca recusa o
+> acesso, e o app avisa "A biblioteca está sendo usada por outro programa".
 
 #### Qual biblioteca recebe os livros
 
@@ -52,7 +70,8 @@ um aviso com as opções:
   cima, como `Documentos`, também funciona se houver uma só biblioteca dentro dela);
 - **Criar biblioteca nova…**: escolha onde; se a pasta não estiver vazia, a biblioteca é
   criada numa subpasta `Calibre Library`. Quem cria é o próprio Calibre (`calibredb`), então
-  o Calibre precisa estar instalado e fechado. Para abri-la depois no Calibre: botão
+  o Calibre precisa estar instalado, e nenhum programa pode estar usando uma biblioteca
+  nesse momento. Para abri-la depois no Calibre: botão
   **Biblioteca > Alternar/criar biblioteca** e escolha a pasta.
 
 Com uma biblioteca escolhida, **Trocar biblioteca…** mostra as mesmas opções. A biblioteca
@@ -120,11 +139,21 @@ O modo automático (campo vazio) também reconhece volumes (`Vol 18`, `Volume 41
 
 Escolha a pasta da biblioteca do Calibre (a que tem `metadata.db`). Os livros aparecem em
 grade de capas como no Calibre: busca por título, autor, etiqueta, série ou editora (sem
-diferenciar acentos), ordem (mais recentes, título, série e volume, autor, publicação) e, ao
-clicar, os
-detalhes do livro com botões para abrir o PDF ou a pasta. A galeria **só lê** a biblioteca
-(banco aberto em modo somente leitura) e funciona com o Calibre aberto. Ela se atualiza
-sozinha depois de uma importação.
+diferenciar acentos) e ordem (mais recentes, título, série e volume, autor, publicação).
+
+- **Barra lateral de séries**: "Todos os livros", "Sem série" e cada série com a quantidade
+  de livros. Clique numa série (ex.: *Spider-Geddon*) para ver só ela, com os volumes em
+  ordem; a busca e a ordem continuam valendo dentro da série.
+- **Renomear série**: o lápis pequeno ao lado da série. Muda a série em todos os livros dela
+  e, se quiser, também os títulos iguais ao nome antigo (volumes importados com `@name`). Se
+  o nome novo já for de outra série, os livros passam para ela (a janela avisa).
+- **Detalhes do livro**: clique na capa. O lápis pequeno ao lado do título renomeia o livro
+  (✓ salva, ✕ cancela); **Abrir livro** abre o PDF.
+
+Para ver, a galeria só lê a biblioteca (banco aberto em modo somente leitura) e funciona com
+o Calibre aberto. Renomear passa pela ferramenta da biblioteca (`calibredb`), como a
+importação: se outro programa estiver usando a biblioteca, feche-o antes. A galeria se
+atualiza sozinha depois de importar ou renomear.
 
 ### 3. Exportar
 
@@ -184,7 +213,8 @@ Cada módulo tem uma responsabilidade; as dependências vão de cima para baixo 
 usa a lógica, a lógica não conhece a interface, e só `library/` conhece o programa externo).
 
 ```
-main.py                    ponto de entrada
+pyproject.toml             projeto, dependências e configuração do `flet run`
+main.py                    ponto de entrada (o que o `flet run` executa)
 personal_library/
   paths.py                 pastas do app (~/.personal_library)
   settings.py              preferências (settings.json)
@@ -203,6 +233,7 @@ personal_library/
   files.py                 cópia verificada, espaço em disco, desfazer (manifesto)
   importer.py              PDFs revisados -> biblioteca (e desfazer)
   exporter.py              biblioteca -> pasta com .opf e capa
+  renamer.py               renomear livros e séries (pela ferramenta da biblioteca)
 
   library/                 a biblioteca de e-books
     manager.py             ÚNICO lugar com os nomes do programa externo
@@ -219,6 +250,7 @@ personal_library/
     library_picker.py      escolher/criar/trocar a biblioteca
     import_tab.py          aba Importar
     gallery_tab.py         aba Galeria
+    series_sidebar.py      barra lateral de séries (filtrar e renomear)
     book_views.py          capa, cartão e detalhes de um livro
     export_tab.py          aba Exportar
 tests/                     pytest: um arquivo por módulo (test_ui_*: ligação da interface)
@@ -238,5 +270,7 @@ aparência nem a compatibilidade com a versão instalada do Flet. Abra o app e t
 
 - A leitura de autor pelo nome do arquivo é uma heurística: confira a lista antes de importar.
 - Listas de autores separadas só por vírgula (`Silva, Souza, Lima`) não são divididas; use `&`.
-- O `calibredb` recusa trabalhar com a biblioteca aberta no Calibre (feche-o para importar).
-- A galeria mostra 60 livros por página e não edita a biblioteca (isso fica com o Calibre).
+- A ferramenta da biblioteca recusa o acesso enquanto outro programa a usa (feche-o para
+  importar).
+- A galeria mostra 60 livros por página e só renomeia livros e séries (o resto da edição
+  fica com o Calibre).

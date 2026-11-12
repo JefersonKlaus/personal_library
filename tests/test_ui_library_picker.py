@@ -32,7 +32,9 @@ def test_use_a_known_library(app, ui, make_library, tmp_path, monkeypatch):
     asyncio.run(use.on_click(None))
     assert app.library == root and app.settings.library == str(root)
     assert not app.library_picker.is_open and app.library_picker.current_row.visible
-    assert str(root) in app.library_picker.current_text.value
+    assert app.library_picker.current_text.value == f"Os livros vão para {root}"
+    assert "Calibre" not in ui.library_picker.IN_USE_HINT  # conselho genérico
+    assert "outro programa" in ui.library_picker.IN_USE_HINT
 
 
 def test_choose_existing_library_accepts_parent_folder(app, make_library, tmp_path):

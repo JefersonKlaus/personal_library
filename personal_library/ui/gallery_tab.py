@@ -1,4 +1,4 @@
-"""Aba Galeria: a biblioteca aberta em grade de capas, com busca, ordem e detalhes."""
+"""Aba Galeria: a biblioteca aberta em grade de capas, com séries, busca, ordem e detalhes."""
 from __future__ import annotations
 
 import asyncio
@@ -7,12 +7,16 @@ from typing import TYPE_CHECKING, Any
 
 import flet as ft
 
+from ..library.cli import LibraryCli
 from ..library.database import LibraryBook
-from ..library.search import SORTS, search, sort_books
+from ..library.manager import PRODUCT
+from ..library.search import NO_SERIES, SORTS, in_series, search, sort_books
 from ..library.thumbnails import thumbnail
 from ..paths import THUMBS_DIR
+from ..renamer import RenameError, rename_book, rename_series
 from ..settings import Settings
-from .book_views import book_card, details_dialog, open_path
+from .book_views import BookDetailsDialog, book_card, open_path
+from .series_sidebar import SeriesSidebar
 from .widgets import page_count, pager_controls, update_pager
 
 if TYPE_CHECKING:  # só para o editor; evita import circular
@@ -57,6 +61,8 @@ class GalleryTab:
         self.body = ft.Column(controls=[self.empty_state], expand=True)
         self.loading = ft.ProgressRing(width=22, height=22, visible=False)
         self.prev_btn, self.page_label, self.next_btn = pager_controls(self.on_prev, self.on_next)
+        self.sidebar = SeriesSidebar(app.page, on_select=self.select_series,
+                                     on_rename=self.rename_series)
 
     def build(self) -> ft.Control:
         picker = self.app.library_picker
@@ -72,8 +78,11 @@ class GalleryTab:
         pager = ft.Row(controls=[self.count_text, ft.Container(expand=True), self.prev_btn,
                                  self.page_label, self.next_btn],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        books_area = ft.Column(controls=[search_row, self.body, pager], spacing=10, expand=True)
         return ft.Container(padding=12, expand=True, content=ft.Column(controls=[
-            library_row, self.library_status, search_row, self.body, pager,
+            library_row, self.library_status,
+            ft.Row(controls=[self.sidebar.container, books_area], spacing=12, expand=True,
+                   vertical_alignment=ft.CrossAxisAlignment.STRETCH),
         ], spacing=10, expand=True))
 
     def store(self, settings: Settings) -> None:
@@ -88,6 +97,7 @@ class GalleryTab:
     async def on_library_changed(self, error: str = "") -> None:
         """Chamado pelo app quando a biblioteca é aberta, recarregada ou falha."""
         self.library_field.value = self.app.settings.library
+        self.sidebar.refresh(self.app.books)
         if self.app.library is None:
             self.library_status.value = error
             self.library_status.color = ft.Colors.RED_700
@@ -105,10 +115,18 @@ class GalleryTab:
     # ------------------------------------------------------------------ busca, ordem, páginas
 
     async def apply_filters(self) -> None:
-        key = self.sort_dropdown.value or "added"
-        self.view = sort_books(search(self.app.books, self.search_field.value or ""), key)
+        """Série escolhida na barra lateral + busca + ordem."""
+        books = in_series(self.app.books, self.sidebar.selected)
+        self.view = sort_books(search(books, self.search_field.value or ""),
+                               self.sort_dropdown.value or "added")
         self.page_index = 0
         await self.render()
+
+    async def select_series(self, series: str | None) -> None:
+        """Dentro de uma série, os volumes em ordem é o que faz sentido (dá para mudar)."""
+        if series not in (None, NO_SERIES):
+            self.sort_dropdown.value = "series"
+        await self.apply_filters()
 
     async def on_search(self, _event: Any) -> None:
         await self.apply_filters()
@@ -152,6 +170,8 @@ class GalleryTab:
         self.loading.visible = False
         if not books or not self.view:
             self._show_empty("A biblioteca está vazia." if not books
+                             else "Nenhum livro encontrado para essa busca nesta série."
+                             if self.sidebar.selected is not None
                              else "Nenhum livro encontrado para essa busca.")
             return
         self.grid.controls = [
@@ -169,8 +189,10 @@ class GalleryTab:
 
     def show_details(self, book: LibraryBook, cover: bytes | None) -> None:
         page = self.app.page
-        page.show_dialog(details_dialog(book, cover, self.app.library, on_open=self.open,
-                                        on_close=lambda _e: page.pop_dialog()))
+        details = BookDetailsDialog(book, cover, self.app.library, on_open=self.open,
+                                    on_close=lambda _e: page.pop_dialog(),
+                                    on_rename=self.rename_book, update=page.update)
+        page.show_dialog(details.dialog)
 
     def open(self, path: Path | None) -> None:
         if path is None or not path.exists():
@@ -180,3 +202,54 @@ class GalleryTab:
             open_path(path)
         except Exception as exc:
             self.app.log(f"Não foi possível abrir {path}: {exc}", error=True)
+
+    # ------------------------------------------------------------------ renomear
+
+    def _ready_to_edit(self) -> LibraryCli | None:
+        """A ferramenta que altera a biblioteca, ou None (com a mensagem já mostrada)."""
+        if self.app.busy or self.app.library is None:
+            return None
+        cli = self.app.cli()
+        if cli is None:
+            self.app.log(f"{PRODUCT} não encontrado: instale-o para renomear.", True)
+        return cli
+
+    async def rename_book(self, book: LibraryBook, new_title: str) -> bool:
+        """Renomeia um livro (botão ao lado do título). True se deu certo."""
+        cli, library = self._ready_to_edit(), self.app.library
+        if cli is None:
+            return False
+        self.app.set_busy(True)
+        try:
+            ok, error = await asyncio.to_thread(rename_book, cli, library, book, new_title)
+        except RenameError as exc:
+            ok, error = False, str(exc)
+        finally:
+            self.app.set_busy(False)
+        if not ok:
+            self.app.log(f"Não foi possível renomear o livro: {error}", True)
+            return False
+        await self.app.open_library(library)
+        self.app.log(f"Livro renomeado: '{book.title}' agora é '{' '.join(new_title.split())}'.")
+        return True
+
+    async def rename_series(self, old: str, new: str, rename_titles: bool) -> None:
+        """Renomeia a série em todos os livros dela (botão na barra lateral)."""
+        cli, library = self._ready_to_edit(), self.app.library
+        if cli is None:
+            return
+        try:
+            report = await self.app.run_job(rename_series, cli, library, self.app.books, old,
+                                            new, rename_titles, label="Renomeando a série")
+        except RenameError as exc:
+            self.app.log(str(exc), True)
+            return
+        for error in report.errors[:20]:
+            self.app.log(f"  ✗ {error}", True)
+        new = " ".join(new.split())
+        if self.sidebar.selected == old and report.done:
+            self.sidebar.selected = new  # continua mostrando a mesma série, com o nome novo
+        await self.app.open_library(library)
+        self.app.log(f"Série '{old}' renomeada para '{new}': {report.done} de {report.total} "
+                     f"livro(s){' (cancelado)' if report.cancelled else ''}.",
+                     error=bool(report.failed))

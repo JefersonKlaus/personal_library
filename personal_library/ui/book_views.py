@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 import flet as ft
 
@@ -104,29 +104,72 @@ def details_rows(book: LibraryBook) -> list[tuple[str, str]]:
     return [(label, value) for label, value in rows if value]
 
 
-def details_dialog(book: LibraryBook, cover: bytes | None, library: Path,
-                   on_open: Callable[[Path | None], None],
-                   on_close: Callable[[Any], None]) -> ft.AlertDialog:
-    """Janela com capa grande, todos os dados e botões para abrir o livro ou a pasta."""
-    info: list[ft.Control] = [
-        ft.Row(controls=[ft.Text(label, size=12, weight=ft.FontWeight.BOLD, width=110),
-                         ft.Text(value, size=12, selectable=True, expand=True)],
-               vertical_alignment=ft.CrossAxisAlignment.START)
-        for label, value in details_rows(book)]
-    comments = html_to_text(book.comments)
-    if comments:
-        info += [ft.Divider(), ft.Text(comments, size=12, selectable=True)]
-    main_file = book.main_file(library)
-    return ft.AlertDialog(
-        title=ft.Text(book.title, weight=ft.FontWeight.BOLD),
-        content=ft.Container(width=660, height=340, content=ft.Row(controls=[
-            cover_view(book, cover, big=True),
-            ft.Column(controls=info, scroll=ft.ScrollMode.AUTO, expand=True, spacing=6),
-        ], vertical_alignment=ft.CrossAxisAlignment.START, spacing=18)),
-        actions=[
-            ft.TextButton("Abrir pasta", icon=ft.Icons.FOLDER_OPEN,
-                          on_click=lambda _e: on_open(book.folder(library))),
-            ft.FilledButton("Abrir livro", icon=ft.Icons.OPEN_IN_NEW,
-                            on_click=lambda _e: on_open(main_file), disabled=main_file is None),
-            ft.TextButton("Fechar", on_click=on_close),
-        ])
+class BookDetailsDialog:
+    """Janela de detalhes: capa grande, todos os dados, 'Abrir livro' e o botão pequeno
+    ao lado do título para renomear o livro."""
+
+    def __init__(self, book: LibraryBook, cover: bytes | None, library: Path,
+                 on_open: Callable[[Path | None], None], on_close: Callable[[Any], None],
+                 on_rename: Callable[[LibraryBook, str], Awaitable[bool]],
+                 update: Callable[[], None]) -> None:
+        self.book = book
+        self.on_rename = on_rename
+        self.update = update
+        # expand_loose: o título ocupa só a largura que precisa (o lápis fica colado nele),
+        # mas títulos longos ainda quebram linha em vez de estourar a janela.
+        self.title_text = ft.Text(book.title, size=20, weight=ft.FontWeight.BOLD, expand=True,
+                                  expand_loose=True)
+        self.title_field = ft.TextField(value=book.title, dense=True, expand=True,
+                                        autofocus=True, on_submit=self.save)
+        self.edit_button = ft.IconButton(icon=ft.Icons.EDIT, icon_size=16,
+                                         tooltip="Renomear livro",
+                                         visual_density=ft.VisualDensity.COMPACT,
+                                         on_click=self.start_edit)
+        self.title_row = ft.Row(controls=[self.title_text, self.edit_button],
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        main_file = book.main_file(library)
+        self.dialog = ft.AlertDialog(
+            title=self.title_row,
+            content=ft.Container(width=660, height=340, content=ft.Row(controls=[
+                cover_view(book, cover, big=True),
+                ft.Column(controls=self._info(), scroll=ft.ScrollMode.AUTO, expand=True,
+                          spacing=6),
+            ], vertical_alignment=ft.CrossAxisAlignment.START, spacing=18)),
+            actions=[
+                ft.FilledButton("Abrir livro", icon=ft.Icons.OPEN_IN_NEW,
+                                on_click=lambda _e: on_open(main_file),
+                                disabled=main_file is None),
+                ft.TextButton("Fechar", on_click=on_close),
+            ])
+
+    def _info(self) -> list[ft.Control]:
+        info: list[ft.Control] = [
+            ft.Row(controls=[ft.Text(label, size=12, weight=ft.FontWeight.BOLD, width=110),
+                             ft.Text(value, size=12, selectable=True, expand=True)],
+                   vertical_alignment=ft.CrossAxisAlignment.START)
+            for label, value in details_rows(self.book)]
+        comments = html_to_text(self.book.comments)
+        if comments:
+            info += [ft.Divider(), ft.Text(comments, size=12, selectable=True)]
+        return info
+
+    def start_edit(self, _event: Any) -> None:
+        self.title_field.value = self.title_text.value
+        self.title_row.controls = [
+            self.title_field,
+            ft.IconButton(icon=ft.Icons.CHECK, icon_size=18, tooltip="Salvar",
+                          visual_density=ft.VisualDensity.COMPACT, on_click=self.save),
+            ft.IconButton(icon=ft.Icons.CLOSE, icon_size=18, tooltip="Cancelar",
+                          visual_density=ft.VisualDensity.COMPACT, on_click=self.cancel_edit),
+        ]
+        self.update()
+
+    def cancel_edit(self, _event: Any = None) -> None:
+        self.title_row.controls = [self.title_text, self.edit_button]
+        self.update()
+
+    async def save(self, _event: Any) -> None:
+        new_title = self.title_field.value or ""
+        if await self.on_rename(self.book, new_title):
+            self.title_text.value = " ".join(new_title.split())
+            self.cancel_edit()

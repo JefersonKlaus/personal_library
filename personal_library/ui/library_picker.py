@@ -20,6 +20,8 @@ if TYPE_CHECKING:  # só para o editor; evita import circular
     from .app import PersonalLibraryApp
 
 MAX_SUGGESTIONS = 4
+IN_USE_HINT = ("Se outro programa estiver usando esta biblioteca (um gerenciador ou leitor de "
+               "e-books), feche-o antes de importar.")
 
 
 class LibraryPicker:
@@ -28,11 +30,12 @@ class LibraryPicker:
     def __init__(self, app: "PersonalLibraryApp") -> None:
         self.app = app
         self._switching = False  # "Trocar biblioteca…" com uma biblioteca válida
-        self.current_text = ft.Text(size=12, expand=True, max_lines=1,
-                                    overflow=ft.TextOverflow.ELLIPSIS)
+        self.current_text = ft.Text(size=12, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
         self.current_row = ft.Row(controls=[
             ft.Icon(ft.Icons.COLLECTIONS_BOOKMARK, color=ft.Colors.INDIGO_700, size=18),
-            self.current_text,
+            ft.Column(controls=[self.current_text, ft.Text(IN_USE_HINT, size=11,
+                                                           color=ft.Colors.GREY_700)],
+                      spacing=0, expand=True),
             ft.TextButton("Trocar biblioteca…", icon=ft.Icons.SWAP_HORIZ,
                           on_click=self.on_switch),
         ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6)
@@ -51,7 +54,7 @@ class LibraryPicker:
                 ft.Row(controls=[self.icon, self.title],
                        vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Text("Os livros importados vão para uma biblioteca. Escolha uma que você já "
-                        f"usa ou crie uma nova (feche o {PRODUCT} antes de criar).", size=12),
+                        "usa ou crie uma nova.", size=12),
                 self.suggestions,
                 ft.Row(controls=[self.btn_choose, self.btn_create, self.btn_cancel], spacing=8),
             ]))
@@ -70,8 +73,7 @@ class LibraryPicker:
         show = not valid or self._switching
         self.panel.visible, self.current_row.visible = show, not show
         self.btn_cancel.visible = valid and self._switching
-        self.current_text.value = (f"Os livros vão para {library} · feche o {PRODUCT} antes de "
-                                   "importar.")
+        self.current_text.value = f"Os livros vão para {library}"
         self.title.value = self._title(library, valid)
         self._style(warning=not valid)
         self.suggestions.controls = self._suggestion_rows(library) if show else []
@@ -166,9 +168,10 @@ class LibraryPicker:
             content=ft.Column(tight=True, spacing=8, width=520, controls=[
                 ft.Text("A biblioteca nova (vazia) será criada em:"),
                 ft.Text(str(target), weight=ft.FontWeight.BOLD, selectable=True),
-                ft.Text(f"Feche o {PRODUCT} antes de continuar. Depois, para abri-la no "
-                        f"{PRODUCT}: botão Biblioteca > Alternar/criar biblioteca > escolha "
-                        "esta pasta.", size=12, color=ft.Colors.GREY_700),
+                ft.Text("Se algum programa estiver usando uma biblioteca de e-books, feche-o "
+                        f"antes de continuar. Depois, para abri-la no {PRODUCT}: botão "
+                        "Biblioteca > Alternar/criar biblioteca > escolha esta pasta.",
+                        size=12, color=ft.Colors.GREY_700),
             ]),
             actions=[ft.TextButton("Cancelar", on_click=lambda _e: page.pop_dialog()),
                      ft.FilledButton("Criar biblioteca", icon=ft.Icons.CREATE_NEW_FOLDER,

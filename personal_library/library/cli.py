@@ -1,8 +1,8 @@
-"""Ferramenta de linha de comando da biblioteca: adicionar, remover e criar biblioteca.
+"""Ferramenta de linha de comando da biblioteca: adicionar, alterar, remover e criar.
 
 Só o próprio programa da biblioteca pode alterá-la (ele mantém o banco de dados);
-o app nunca escreve na pasta da biblioteca. Com o programa aberto, a ferramenta
-recusa o acesso, por isso as mensagens pedem para fechá-lo.
+o app nunca escreve na pasta da biblioteca. Enquanto outro programa estiver usando
+uma biblioteca, a ferramenta recusa o acesso (para não corromper o banco).
 """
 from __future__ import annotations
 
@@ -15,9 +15,11 @@ from pathlib import Path
 
 from ..models import BookEntry
 from .location import is_library
-from .manager import CLI_NAME, INSTALL_DIRS, LANGUAGE_ENV, PRODUCT
+from .manager import CLI_NAME, INSTALL_DIRS, LANGUAGE_ENV
 
 _ADDED_IDS = re.compile(r"Added book ids?:\s*([\d,\s]+)", re.I)
+LIBRARY_IN_USE = ("A biblioteca está sendo usada por outro programa (por exemplo, um "
+                  "gerenciador ou leitor de e-books). Feche esse programa e tente de novo.")
 
 
 @dataclass
@@ -72,11 +74,12 @@ def parse_added_ids(output: str) -> list[int]:
 
 
 def _error_message(output: str) -> str:
+    """Mensagem para o usuário. Biblioteca em uso vira uma explicação clara, em vez da
+    última linha (técnica, em inglês) da saída da ferramenta."""
     output = output.strip()
-    message = output.splitlines()[-1] if output else "erro desconhecido"
     if "running" in output.lower():
-        message += f" Feche o {PRODUCT} e tente de novo."
-    return message
+        return LIBRARY_IN_USE
+    return output.splitlines()[-1] if output else "erro desconhecido"
 
 
 class LibraryCli:
@@ -125,6 +128,21 @@ class LibraryCli:
             return True, ""
         command = [str(self.executable), "remove", "--with-library", str(library),
                    ",".join(str(book_id) for book_id in ids)]
+        try:
+            done = self._run(command)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"não foi possível executar: {exc}"
+        return (True, "") if done.returncode == 0 else (
+            False, _error_message(f"{done.stdout}\n{done.stderr}"))
+
+    def set_fields(self, library: Path, book_id: int, fields: dict[str, str]) -> tuple[bool, str]:
+        """Altera campos de um livro (ex.: {'title': ..., 'sort': ...}). Devolve (ok, erro).
+
+        Mudar o título também renomeia a pasta do livro; quem faz isso é a ferramenta.
+        """
+        command = [str(self.executable), "set_metadata", "--with-library", str(library)]
+        command += [f"--field={name}:{value}" for name, value in fields.items()]
+        command.append(str(book_id))
         try:
             done = self._run(command)
         except (OSError, subprocess.TimeoutExpired) as exc:
