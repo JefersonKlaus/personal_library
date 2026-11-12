@@ -9,8 +9,8 @@ def run() -> int:
         print("Flet não está instalado. Rode:  pip install -r requirements.txt")
         return 1
 
-    from pdf2calibre.app_logging import setup_logging
-    from pdf2calibre.ui import main
+    from personal_library.logging_setup import setup_logging
+    from personal_library.ui.app import main
 
     setup_logging()
     ft.run(main)

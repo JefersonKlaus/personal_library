@@ -19,7 +19,7 @@ python main.py
 ```
 
 Precisa do [Calibre](https://calibre-ebook.com) instalado (o app usa o `calibredb` dele para
-importar). As miniaturas da galeria ficam em cache em `~/.pdf2calibre/thumbs`.
+importar). Preferências, registro e miniaturas da galeria ficam em `~/.personal_library`.
 
 ## Como usar
 
@@ -149,21 +149,22 @@ desmarque "Uma pasta por livro", porque o Calibre não olha subpastas).
 A barra de baixo mostra o progresso, o botão **Cancelar** e a última mensagem; **Registro**
 abre o histórico (ele abre sozinho quando há erro).
 
-## Como o Calibre lê os metadados
+## Como a biblioteca lê os metadados
 
-Regras conferidas no código do Calibre (`calibre/ebooks/metadata/meta.py` e `opf2.py`):
+Regras conferidas no código do Calibre (`calibre/ebooks/metadata/meta.py` e `opf2.py`); os
+nomes exigidos por ele ficam todos em `personal_library/library/manager.py`:
 
-- O Calibre só usa um `.opf` que tenha `<dc:identifier opf:scheme="calibre">`. Sem isso, ele
-  ignora o arquivo e usa o que está dentro do PDF ("Microsoft Word - doc1", "admin"...).
-- Para um PDF adicionado sozinho, ele só procura o `.opf` **com o mesmo nome** do PDF.
-  Por isso o app grava `Título - Autor.opf`, e não `metadata.opf`.
-- O ano vai como `AAAA-01-01T12:00:00+00:00`: com meia-noite UTC o Calibre mostraria
-  dezembro do ano anterior em fusos como o do Brasil.
+- Só é usado um `.opf` que tenha o identificador `opf:scheme="calibre"`. Sem ele, o arquivo
+  é ignorado e valem os dados de dentro do PDF ("Microsoft Word - doc1", "admin"...).
+- Para um PDF adicionado sozinho, só é lido o `.opf` **com o mesmo nome** do PDF.
+  Por isso o app grava `Título - Autor.opf`.
+- O ano vai como `AAAA-01-01T12:00:00+00:00`: com meia-noite UTC apareceria dezembro do ano
+  anterior em fusos como o do Brasil.
 - O `opf:file-as` de todos os autores leva a ordenação do livro inteiro
-  (`Lima, Ana & Dias, Rui`), que é como o Calibre grava e lê.
-- O `calibredb` é chamado com `CALIBRE_OVERRIDE_LANG=en`, para o app entender a resposta
-  mesmo com o Calibre em português.
-- Importar passa por uma pasta temporária (PDF + `.opf` + capa) e `calibredb add`; a pasta
+  (`Lima, Ana & Dias, Rui`), que é como a biblioteca grava e lê.
+- A ferramenta de linha de comando (`calibredb`) é chamada com a saída em inglês, para o app
+  entender a resposta mesmo com o programa em português.
+- Importar passa por uma pasta temporária (PDF + `.opf` + capa) e a ferramenta; a pasta
   temporária é apagada no fim, mesmo se der erro.
 
 ## Segurança dos arquivos
@@ -171,31 +172,56 @@ Regras conferidas no código do Calibre (`calibre/ebooks/metadata/meta.py` e `op
 - Os PDFs de origem nunca são alterados nem apagados.
 - Cópias são gravadas como `.part`, verificadas (tamanho e SHA-256) e só então renomeadas;
   o `.opf` e a capa são gravados antes, para o livro nunca aparecer sem eles.
-- A biblioteca do Calibre só é alterada pelo próprio Calibre (`calibredb`); o app apenas lê
-  o `metadata.db`.
+- A biblioteca só é alterada pela ferramenta do próprio Calibre (`calibredb`); o app apenas
+  lê o banco de dados dela (em modo somente leitura).
 - Desfazer nunca sobrescreve arquivos; importações desfeitas vão para a lixeira do Calibre.
 - Se o disco não tiver espaço para o lote, nada é copiado.
 - Nenhum PDF sai do seu computador; não há rede nem telemetria.
 
 ## Estrutura
 
+Cada módulo tem uma responsabilidade; as dependências vão de cima para baixo (a interface
+usa a lógica, a lógica não conhece a interface, e só `library/` conhece o programa externo).
+
 ```
-main.py                  ponto de entrada
-pdf2calibre/
-  models.py              BookEntry, Options, Report...
-  naming.py              nomes de arquivo -> título/autor; nomes seguros
-  metadata.py            leitura de PDF (pypdf) e montagem do BookEntry
-  planner.py             achar PDFs, duplicados, caminhos
-  organizer.py           cópia verificada, OPF, capa, desfazer
-  opf.py / cover.py      arquivo .opf e capa
-  calibre.py             integração com calibredb (add, remove)
-  library_import.py      aba Importar: PDFs revisados -> biblioteca (calibredb)
-  library.py             leitura somente leitura da biblioteca do Calibre
-  exporter.py            aba Exportar: biblioteca -> pasta no formato do Calibre
-  settings.py            preferências em ~/.pdf2calibre/settings.json
-  ui.py                  janela e abas Importar/Exportar (Flet)
-  gallery_ui.py          aba Galeria (grade de capas, busca, detalhes)
-tests/                   pytest (lógica + ligação da interface)
+main.py                    ponto de entrada
+personal_library/
+  paths.py                 pastas do app (~/.personal_library)
+  settings.py              preferências (settings.json)
+  logging_setup.py         registro em arquivo
+  models.py                BookEntry, ImportOptions, Status
+
+  text.py                  limpeza de texto, nomes seguros de arquivo, busca sem acentos
+  people.py                nomes de pessoas: reconhecer, separar, ordenar
+  volumes.py               volumes no nome ("Vol 18", "v03")
+  filename_parser.py       modo automático: título/autor/volume do nome do arquivo
+  import_spec.py           "Como importar": @name - @vol; @auth=ONE
+
+  pdf_reader.py            metadados de dentro do PDF (e o que é lixo)
+  pdf_cover.py             capa = 1ª página
+  analysis.py              achar PDFs, montar cada livro, duplicados
+  files.py                 cópia verificada, espaço em disco, desfazer (manifesto)
+  importer.py              PDFs revisados -> biblioteca (e desfazer)
+  exporter.py              biblioteca -> pasta com .opf e capa
+
+  library/                 a biblioteca de e-books
+    manager.py             ÚNICO lugar com os nomes do programa externo
+    database.py            leitura somente leitura do banco da biblioteca
+    search.py              busca e ordem
+    thumbnails.py          miniaturas das capas
+    opf.py                 formato .opf
+    location.py            validar, achar e onde criar bibliotecas
+    cli.py                 ferramenta de linha de comando: adicionar, remover, criar
+
+  ui/                      interface Flet
+    app.py                 janela, barra de status, tarefas e a biblioteca aberta
+    widgets.py             peças reutilizadas (seções, paginação, cores)
+    library_picker.py      escolher/criar/trocar a biblioteca
+    import_tab.py          aba Importar
+    gallery_tab.py         aba Galeria
+    book_views.py          capa, cartão e detalhes de um livro
+    export_tab.py          aba Exportar
+tests/                     pytest: um arquivo por módulo (test_ui_*: ligação da interface)
 ```
 
 ## Testes

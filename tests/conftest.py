@@ -8,7 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pdf2calibre.models import Options  # noqa: E402
+from personal_library.library.manager import DATABASE_FILE  # noqa: E402
+from personal_library.models import ImportOptions  # noqa: E402
 
 
 def _make_pdf(path: Path, title: str | None = None, author: str | None = None,
@@ -32,14 +33,14 @@ def make_pdf():
 
 
 @pytest.fixture
-def options() -> Options:
-    return Options(workers=2)
+def options() -> ImportOptions:
+    return ImportOptions(workers=2)
 
 
-# ---------------------------------------------------------------- biblioteca do Calibre
+# ---------------------------------------------------------------- biblioteca
 
-# Subconjunto do esquema real do Calibre (resources/metadata_sqlite.sql), mesmos nomes.
-CALIBRE_SCHEMA = """
+# Subconjunto do esquema real do banco da biblioteca, com os mesmos nomes de tabelas.
+LIBRARY_SCHEMA = """
 CREATE TABLE books (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL DEFAULT 'Unknown'
     COLLATE NOCASE, sort TEXT COLLATE NOCASE, timestamp TIMESTAMP, pubdate TIMESTAMP,
     series_index REAL NOT NULL DEFAULT 1.0, author_sort TEXT COLLATE NOCASE,
@@ -88,12 +89,12 @@ def _jpeg(path: Path, color: str = "navy") -> None:
 
 
 def _make_library(root: Path, books=SAMPLE_BOOKS) -> Path:
-    """Cria uma biblioteca no formato do Calibre: metadata.db + Autor/Título (id)/."""
+    """Cria uma biblioteca: banco de dados + Autor/Título (id)/."""
     import sqlite3
 
     root.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(root / "metadata.db")
-    conn.executescript(CALIBRE_SCHEMA)
+    conn = sqlite3.connect(root / DATABASE_FILE)
+    conn.executescript(LIBRARY_SCHEMA)
     for book_id, (title, authors, sort, a_sort, added, pub, series, tags, cover) in enumerate(
             books, start=1):
         rel = f"{authors[0]}/{title} ({book_id})"
@@ -145,3 +146,128 @@ def _make_library(root: Path, books=SAMPLE_BOOKS) -> Path:
 @pytest.fixture
 def make_library():
     return _make_library
+
+
+# ---------------------------------------------------------------- interface (Flet de mentira)
+#
+# Valida a lógica de ligação da interface (botões -> funções, estado, mensagens), NÃO a
+# aparência nem a API real do Flet.
+
+import asyncio  # noqa: E402
+import importlib  # noqa: E402
+import types  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
+
+UI_MODULES = ("app", "import_tab", "gallery_tab", "export_tab", "library_picker", "book_views",
+              "widgets")
+ENUM_NAMES = {"Colors", "Icons", "FontWeight", "CrossAxisAlignment", "ScrollMode", "StackFit",
+              "ThemeMode", "FilePickerFileType", "TextOverflow", "TextAlign", "BoxFit",
+              "Alignment", "MainAxisAlignment", "Border"}
+
+
+class _Name(str):
+    """Valor de enum falso; também funciona como fábrica (ft.Border.all(1, cor))."""
+
+    def __call__(self, *args, **kwargs):
+        return self
+
+
+class _Enum:
+    def __getattr__(self, name):
+        return _Name(name)
+
+
+class FakeControl:
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.value = args[0] if args and isinstance(args[0], str) else None
+        self.controls = []
+        self.disabled = False
+        self.visible = True
+        self.__dict__.update(kwargs)
+
+
+class FakeFlet(types.ModuleType):
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return _Enum() if name in ENUM_NAMES else FakeControl
+
+
+class FakePage:
+    def __init__(self):
+        self.services, self.overlay, self.added, self.dialogs = [], [], [], []
+        self.window = SimpleNamespace()
+
+    def add(self, *controls):
+        self.added.extend(controls)
+
+    def update(self):
+        pass
+
+    def show_dialog(self, dialog):
+        self.dialogs.append(dialog)
+
+    def pop_dialog(self):
+        self.dialogs.pop()
+
+
+class FakePicker:
+    def __init__(self, files=None, folder=None, error=None):
+        self.files, self.folder, self.error = files, folder, error
+
+    async def pick_files(self, **_kwargs):
+        if self.error:
+            raise self.error
+        return self.files
+
+    async def get_directory_path(self, **_kwargs):
+        if self.error:
+            raise self.error
+        return self.folder
+
+
+@pytest.fixture
+def ui(monkeypatch):
+    """Os módulos da interface carregados com o Flet de mentira."""
+    from personal_library.settings import Settings
+
+    monkeypatch.setitem(sys.modules, "flet", FakeFlet("flet"))
+    for name in UI_MODULES:
+        monkeypatch.delitem(sys.modules, f"personal_library.ui.{name}", raising=False)
+    modules = {name: importlib.import_module(f"personal_library.ui.{name}") for name in UI_MODULES}
+    monkeypatch.setattr(modules["app"], "load_settings", lambda: Settings())
+    monkeypatch.setattr(modules["app"], "save_settings", lambda _settings: True)
+    monkeypatch.setattr(modules["library_picker"], "known_libraries", lambda *a: [])
+    yield SimpleNamespace(**modules)
+    for name in UI_MODULES:
+        sys.modules.pop(f"personal_library.ui.{name}", None)
+
+
+@pytest.fixture
+def app(ui, tmp_path):
+    instance = ui.app.PersonalLibraryApp(FakePage())
+    instance.gallery.thumb_cache = tmp_path / "thumbs"  # não usa a pasta do usuário
+    instance.build()
+    return instance
+
+
+@pytest.fixture
+def fake_cli(monkeypatch):
+    """Troca a ferramenta da biblioteca; `fake_cli.set(None)` simula 'não instalada'."""
+    from personal_library.library.cli import LibraryCli
+
+    holder = SimpleNamespace(tool=SimpleNamespace(name="cli"))
+    holder.set = lambda tool: setattr(holder, "tool", tool)
+    monkeypatch.setattr(LibraryCli, "find", classmethod(lambda cls, custom=None: holder.tool))
+    return holder
+
+
+def log_lines(app):
+    return [control.value for control in app.log_view.controls]
+
+
+def open_library(app, make_library, tmp_path, name="Biblioteca"):
+    root = make_library(tmp_path / name)
+    assert asyncio.run(app.open_library(root))
+    return root
