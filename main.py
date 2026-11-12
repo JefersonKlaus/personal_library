@@ -9,8 +9,8 @@ def run() -> int:
         print("Flet não está instalado. Rode:  pip install -r requirements.txt")
         return 1
 
-    from personal_library.logging_setup import setup_logging
-    from personal_library.ui.app import main
+    from src.core.logging_setup import setup_logging
+    from src.ui.app import main
 
     setup_logging()
     # no_cdn: no modo web (`flet run --web`) os arquivos do Flet saem do próprio app,

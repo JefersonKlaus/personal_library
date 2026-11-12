@@ -17,14 +17,14 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, Iterable
 
-from .files import sha256_file
-from .filename_parser import ParsedName
-from .import_spec import ImportSpec, PatternError, apply_spec, compile_spec
-from .models import USABLE_STATUSES, BookEntry, ImportOptions, Status
-from .pdf_reader import PdfInfo, is_junk_author, is_junk_title, looks_like_pdf, read_pdf_info
-from .people import split_authors
-from .text import fold, natural_key
-from .volumes import looks_like_volume
+from ..core.files import sha256_file
+from ..parsing.filename_parser import ParsedName
+from ..parsing.import_spec import ImportSpec, PatternError, apply_spec, compile_spec
+from ..core.models import USABLE_STATUSES, BookEntry, ImportOptions, Status
+from ..pdf.pdf_reader import PdfInfo, is_junk_author, is_junk_title, looks_like_pdf, read_pdf_info
+from ..parsing.people import split_authors
+from ..core.text import fold, natural_key
+from ..parsing.volumes import looks_like_volume
 
 ProgressFn = Callable[[int, int, str], None]
 _SUSPICIOUS_NOTES = ("nome fora do padrão", "o autor", "o título")

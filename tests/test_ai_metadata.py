@@ -3,9 +3,9 @@ import json
 import threading
 from pathlib import Path
 
-from personal_library import ai_metadata, analysis
-from personal_library.groq_client import GroqError
-from personal_library.models import BookEntry, ImportOptions, Status
+from src.importing import ai_metadata, analysis
+from src.importing.groq_client import GroqError
+from src.core.models import BookEntry, ImportOptions, Status
 
 
 class FakeClient:

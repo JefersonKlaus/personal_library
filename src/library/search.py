@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ..text import fold
+from ..core.text import fold
 from .database import LibraryBook
 
 NO_SERIES = ""  # filtro "Sem série" (None = todos os livros)

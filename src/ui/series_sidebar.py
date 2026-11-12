@@ -7,8 +7,8 @@ import flet as ft
 
 from ..library.database import LibraryBook
 from ..library.search import NO_SERIES, series_counts
-from ..renamer import titles_like_series
-from ..text import fold
+from ..library.renamer import titles_like_series
+from ..core.text import fold
 
 SelectFn = Callable[[str | None], Awaitable[None]]  # None = todos os livros
 RenameFn = Callable[[str, str, bool], Awaitable[None]]  # (antigo, novo, renomear títulos)

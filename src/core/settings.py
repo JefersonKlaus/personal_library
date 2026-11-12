@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
-from .groq_client import DEFAULT_MODEL
+from ..importing.groq_client import DEFAULT_MODEL
 from .models import ImportOptions
 from .paths import SETTINGS_FILE
 

@@ -2,11 +2,11 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from personal_library import exporter
-from personal_library.files import FileOperationError, undo_manifest
-from personal_library.library import database as lib
-from personal_library.library.manager import OPF_META_PREFIX, OPF_TRUSTED_SCHEME
-from personal_library.models import Status
+from src.exporting import exporter
+from src.core.files import FileOperationError, undo_manifest
+from src.library import database as lib
+from src.library.manager import OPF_META_PREFIX, OPF_TRUSTED_SCHEME
+from src.core.models import Status
 
 NS = {"dc": "http://purl.org/dc/elements/1.1/", "opf": "http://www.idpf.org/2007/opf"}
 OPF = "{http://www.idpf.org/2007/opf}"

@@ -1,6 +1,6 @@
 import pytest
 
-from personal_library import files
+from src.core import files
 
 
 def test_sha256_is_stable(tmp_path):

@@ -4,7 +4,7 @@ import inspect
 
 from conftest import FakePicker, log_lines
 
-from personal_library.library.manager import DATABASE_FILE, DEFAULT_LIBRARY_NAME
+from src.library.manager import DATABASE_FILE, DEFAULT_LIBRARY_NAME
 
 
 def test_asks_for_a_library_when_there_is_none(app):

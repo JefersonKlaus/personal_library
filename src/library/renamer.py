@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .library.cli import LibraryCli
-from .library.database import LibraryBook
-from .text import fold, normalize_text, title_sort
+from ..core.text import fold, normalize_text, title_sort
+from .cli import LibraryCli
+from .database import LibraryBook
 
 ProgressFn = Callable[[int, int, str], None]
 

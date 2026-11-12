@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING, Any
 
 import flet as ft
 
-from .. import exporter
-from ..files import latest_manifest, undo_manifest
+from ..exporting import exporter
+from ..core.files import latest_manifest, undo_manifest
 from ..library.database import LibraryBook
 from ..library.search import search
-from ..models import Status
-from ..settings import Settings
+from ..core.models import Status
+from ..core.settings import Settings
 from .widgets import (STATUS_COLORS, TAB_GALLERY, page_count, pager_controls, section,
                       update_pager)
 

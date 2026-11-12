@@ -3,8 +3,10 @@ import threading
 
 from pypdf import PdfReader, PdfWriter
 
-from personal_library import analysis, files, pdf_reader
-from personal_library.models import ImportOptions, Status
+from src.importing import analysis
+from src.core import files
+from src.pdf import pdf_reader
+from src.core.models import ImportOptions, Status
 
 
 def test_junk_detection():

@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import flet as ft
 
-from .. import ai_metadata, analysis, importer
-from ..groq_client import DEFAULT_MODEL, GroqClient, resolve_api_key
-from ..import_spec import FIELD_LABELS, PATTERN_HELP, PatternError, apply_spec, compile_spec
+from ..importing import ai_metadata, analysis, importer
+from ..importing.groq_client import DEFAULT_MODEL, GroqClient, resolve_api_key
+from ..parsing.import_spec import FIELD_LABELS, PATTERN_HELP, PatternError, apply_spec, compile_spec
 from ..library.manager import PRODUCT
-from ..models import BookEntry, ImportOptions, Status
-from ..settings import Settings
-from ..volumes import looks_like_volume
+from ..core.models import BookEntry, ImportOptions, Status
+from ..core.settings import Settings
+from ..parsing.volumes import looks_like_volume
 from .widgets import (STATUS_COLORS, format_size, option_grid, page_count, pager_controls,
                       section, update_pager)
 

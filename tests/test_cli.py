@@ -5,9 +5,9 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 
-from personal_library.library import cli
-from personal_library.library.manager import CLI_NAME, LANGUAGE_ENV
-from personal_library.models import BookEntry
+from src.library import cli
+from src.library.manager import CLI_NAME, LANGUAGE_ENV
+from src.core.models import BookEntry
 
 POSIX_ONLY = pytest.mark.skipif(os.name == "nt", reason="usa um script shell falso")
 
@@ -106,8 +106,8 @@ def test_remove_books(tmp_path):
 
 @POSIX_ONLY
 def test_create_library(tmp_path):
-    from personal_library.library.location import is_library
-    from personal_library.library.manager import DATABASE_FILE
+    from src.library.location import is_library
+    from src.library.manager import DATABASE_FILE
 
     tool = cli.LibraryCli(_fake_tool(tmp_path / "tool", (
         "lib = pathlib.Path(sys.argv[sys.argv.index('--with-library') + 1])\n"

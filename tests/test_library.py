@@ -5,9 +5,9 @@ from datetime import datetime
 
 import pytest
 
-from personal_library.library import database, search, thumbnails
-from personal_library.library.manager import DATABASE_FILE
-from personal_library.text import html_to_text
+from src.library import database, search, thumbnails
+from src.library.manager import DATABASE_FILE
+from src.core.text import html_to_text
 
 
 def _by_title(books):

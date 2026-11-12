@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 
 from .filename_parser import ParsedName, automatic_values, compose
-from .text import extract_year, normalize_text, strip_noise
+from ..core.text import extract_year, normalize_text, strip_noise
 from .volumes import VOL_NUMBER, VOL_TRAILING, VOL_WORD, match_volume
 
 

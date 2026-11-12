@@ -13,7 +13,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..models import BookEntry
+from ..core.models import BookEntry
 from .location import is_library
 from .manager import CLI_NAME, INSTALL_DIRS, LANGUAGE_ENV
 

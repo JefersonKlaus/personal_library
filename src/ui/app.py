@@ -17,7 +17,7 @@ import flet as ft
 from .. import APP_NAME
 from ..library.cli import LibraryCli
 from ..library.database import LibraryBook, LibraryError, load_library
-from ..settings import Settings, load_settings, save_settings
+from ..core.settings import Settings, load_settings, save_settings
 from .export_tab import ExportTab
 from .gallery_tab import GalleryTab
 from .import_tab import ImportTab

@@ -5,8 +5,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from personal_library import groq_client
-from personal_library.groq_client import GroqClient, GroqError
+from src.importing import groq_client
+from src.importing.groq_client import GroqClient, GroqError
 
 
 class FakeGroq:

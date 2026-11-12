@@ -5,16 +5,21 @@ import hashlib
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 import flet as ft
 
 from ..library.database import LibraryBook
-from ..text import html_to_text
+from ..core.text import html_to_text
 
 # Cores das capas geradas para livros sem capa.
 PLACEHOLDER_COLORS = ["#37474F", "#4E342E", "#1B5E20", "#0D47A1", "#4A148C", "#B71C1C", "#006064"]
+
+# Dois cliques no mesmo cartão dentro deste intervalo contam como duplo clique
+# (o mesmo padrão do Windows).
+DOUBLE_CLICK_SECONDS = 0.5
 
 
 def open_path(path: Path) -> None:
@@ -73,11 +78,19 @@ class BookCard:
     """Cartão da grade: capa, título (2 linhas) e autor.
 
     Como num gerenciador de arquivos: um clique só seleciona; dois cliques, ou botão
-    direito > Abrir, abrem a janela de detalhes."""
+    direito > Abrir, abrem a janela de detalhes.
+
+    O duplo clique é detectado aqui, não com o on_double_tap do GestureDetector: com
+    on_double_tap presente, o Flutter segura todo clique esquerdo por ~300 ms esperando
+    um possível segundo clique antes de disparar on_tap, e a seleção ficava atrasada
+    (o botão direito, sem essa espera, era instantâneo). Com on_tap_down o clique
+    esquerdo seleciona no momento em que o botão é pressionado, igual ao direito."""
 
     def __init__(self, book: LibraryBook, cover: bytes | None, selected: bool,
                  on_select: Handler, on_open: Handler) -> None:
         self.book = book
+        self.on_select, self.on_open = on_select, on_open
+        self._last_tap: float | None = None  # hora do clique anterior (duplo clique)
         cover_control = cover_view(book, cover)
         tooltip = f"{book.title}\n{book.authors_text}"
         if book.series:
@@ -97,10 +110,22 @@ class BookCard:
         self.set_selected(selected)
         self.control = ft.ContextMenu(
             content=ft.GestureDetector(content=self.frame, mouse_cursor=ft.MouseCursor.CLICK,
-                                       on_tap=on_select, on_double_tap=on_open,
+                                       on_tap_down=self.on_tap_down,
                                        on_secondary_tap_down=on_select),
             secondary_items=[ft.PopupMenuItem(content="Abrir", icon=ft.Icons.OPEN_IN_NEW,
                                               on_click=on_open)])
+
+    def on_tap_down(self, event: Any) -> None:
+        """Clique esquerdo: seleciona na hora; se for o segundo de um duplo clique, abre."""
+        now = time.monotonic()
+        double = self._last_tap is not None and now - self._last_tap <= DOUBLE_CLICK_SECONDS
+        # Depois de um duplo clique, o próximo clique recomeça a contagem (3 cliques
+        # rápidos não abrem a janela duas vezes).
+        self._last_tap = None if double else now
+        if double:
+            self.on_open(event)  # on_open também seleciona
+        else:
+            self.on_select(event)
 
     def set_selected(self, selected: bool) -> None:
         self.selected = selected

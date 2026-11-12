@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from .text import normalize_text
+from ..core.text import normalize_text
 
 logger = logging.getLogger(__name__)
 

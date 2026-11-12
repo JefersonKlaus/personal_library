@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 
 from .people import author_score, looks_like_person
-from .text import extract_year, normalize_text, strip_noise
+from ..core.text import extract_year, normalize_text, strip_noise
 from .volumes import VOL_TRAILING, match_volume, volume_from
 
 SEPARATOR = re.compile(r"\s+[-–—]\s+")  # " - " entre as partes do nome

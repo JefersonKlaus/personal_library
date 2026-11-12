@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import flet as ft
 
-from ..models import Status
+from ..core.models import Status
 
 TAB_IMPORT, TAB_GALLERY, TAB_EXPORT = range(3)  # ordem das abas na janela
 

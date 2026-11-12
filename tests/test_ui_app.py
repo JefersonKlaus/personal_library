@@ -16,7 +16,7 @@ def test_build_registers_picker_and_three_tabs(app):
 
 
 def test_app_name(ui):
-    from personal_library import APP_NAME
+    from src import APP_NAME
 
     assert APP_NAME == "Personal Library"
 
@@ -69,7 +69,7 @@ def test_format_size(ui):
 def test_no_lambda_calls_an_async_method():
     """Um lambda que chama método async devolve uma corrotina que o Flet ignora
     (o botão parece não fazer nada). Os handlers async precisam ser async def."""
-    ui_dir = Path(__file__).parent.parent / "personal_library" / "ui"
+    ui_dir = Path(__file__).parent.parent / "src" / "ui"
     trees = {path.name: ast.parse(path.read_text(encoding="utf-8"))
              for path in ui_dir.glob("*.py")}
     async_methods = {node.name for tree in trees.values() for node in ast.walk(tree)

@@ -12,9 +12,9 @@ from ..library.database import LibraryBook
 from ..library.manager import PRODUCT
 from ..library.search import NO_SERIES, SORTS, in_series, search, sort_books
 from ..library.thumbnails import thumbnail
-from ..paths import THUMBS_DIR
-from ..renamer import RenameError, rename_book, rename_series
-from ..settings import Settings
+from ..core.paths import THUMBS_DIR
+from ..library.renamer import RenameError, rename_book, rename_series
+from ..core.settings import Settings
 from .book_views import BookCard, BookDetailsDialog, open_path
 from .series_sidebar import SeriesSidebar
 from .widgets import page_count, pager_controls, update_pager

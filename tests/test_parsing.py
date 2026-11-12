@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from personal_library import filename_parser, import_spec, people, text, volumes
+from src.parsing import filename_parser, import_spec, people, volumes
+from src.core import text
 
 
 def test_sanitize_replaces_invalid_characters():

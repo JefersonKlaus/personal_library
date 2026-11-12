@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 
-from personal_library.library import opf
-from personal_library.library.manager import OPF_META_PREFIX, OPF_TRUSTED_SCHEME
+from src.library import opf
+from src.library.manager import OPF_META_PREFIX, OPF_TRUSTED_SCHEME
 
 NS = {"dc": "http://purl.org/dc/elements/1.1/", "opf": "http://www.idpf.org/2007/opf"}
 OPF = "{http://www.idpf.org/2007/opf}"

@@ -8,8 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from personal_library.library.manager import DATABASE_FILE  # noqa: E402
-from personal_library.models import ImportOptions  # noqa: E402
+from src.library.manager import DATABASE_FILE  # noqa: E402
+from src.core.models import ImportOptions  # noqa: E402
 
 
 def _make_pdf(path: Path, title: str | None = None, author: str | None = None,
@@ -230,18 +230,18 @@ class FakePicker:
 @pytest.fixture
 def ui(monkeypatch):
     """Os módulos da interface carregados com o Flet de mentira."""
-    from personal_library.settings import Settings
+    from src.core.settings import Settings
 
     monkeypatch.setitem(sys.modules, "flet", FakeFlet("flet"))
     for name in UI_MODULES:
-        monkeypatch.delitem(sys.modules, f"personal_library.ui.{name}", raising=False)
-    modules = {name: importlib.import_module(f"personal_library.ui.{name}") for name in UI_MODULES}
+        monkeypatch.delitem(sys.modules, f"src.ui.{name}", raising=False)
+    modules = {name: importlib.import_module(f"src.ui.{name}") for name in UI_MODULES}
     monkeypatch.setattr(modules["app"], "load_settings", lambda: Settings())
     monkeypatch.setattr(modules["app"], "save_settings", lambda _settings: True)
     monkeypatch.setattr(modules["library_picker"], "known_libraries", lambda *a: [])
     yield SimpleNamespace(**modules)
     for name in UI_MODULES:
-        sys.modules.pop(f"personal_library.ui.{name}", None)
+        sys.modules.pop(f"src.ui.{name}", None)
 
 
 @pytest.fixture
@@ -255,7 +255,7 @@ def app(ui, tmp_path):
 @pytest.fixture
 def fake_cli(monkeypatch):
     """Troca a ferramenta da biblioteca; `fake_cli.set(None)` simula 'não instalada'."""
-    from personal_library.library.cli import LibraryCli
+    from src.library.cli import LibraryCli
 
     holder = SimpleNamespace(tool=SimpleNamespace(name="cli"))
     holder.set = lambda tool: setattr(holder, "tool", tool)

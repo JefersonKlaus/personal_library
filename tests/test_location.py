@@ -1,7 +1,7 @@
 import json
 
-from personal_library.library import location
-from personal_library.library.manager import (CONFIG_DIR_ENV, CURRENT_LIBRARY_FILE,
+from src.library import location
+from src.library.manager import (CONFIG_DIR_ENV, CURRENT_LIBRARY_FILE,
                                               CURRENT_LIBRARY_KEY, DATABASE_FILE,
                                               DEFAULT_LIBRARY_NAME, RECENT_LIBRARIES_FILE,
                                               RECENT_LIBRARIES_KEY)

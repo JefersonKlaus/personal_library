@@ -15,13 +15,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .files import (CreatedFiles, FileOperationError, copy_verified, ensure_free_space,
+from ..core.files import (CreatedFiles, FileOperationError, copy_verified, ensure_free_space,
                     make_dirs, remove_empty_dirs, write_manifest)
-from .library.database import LibraryBook
-from .library.location import find_library_root
-from .library.opf import OpfData, render_opf
-from .models import Status
-from .text import book_stem, fold, sanitize_component
+from ..library.database import LibraryBook
+from ..library.location import find_library_root
+from ..library.opf import OpfData, render_opf
+from ..core.models import Status
+from ..core.text import book_stem, fold, sanitize_component
 
 logger = logging.getLogger(__name__)
 ProgressFn = Callable[[int, int, str], None]

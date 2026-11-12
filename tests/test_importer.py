@@ -3,9 +3,9 @@ import threading
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from personal_library import analysis, importer
-from personal_library.library.cli import AddResult
-from personal_library.models import ImportOptions, Status
+from src.importing import analysis, importer
+from src.library.cli import AddResult
+from src.core.models import ImportOptions, Status
 
 NS = {"dc": "http://purl.org/dc/elements/1.1/", "opf": "http://www.idpf.org/2007/opf"}
 
@@ -122,7 +122,7 @@ def test_volumes_already_in_library_are_skipped(tmp_path, make_pdf, make_library
 
 
 def test_opf_of_an_imported_book(tmp_path):
-    from personal_library.models import BookEntry
+    from src.core.models import BookEntry
 
     entry = BookEntry(Path("x.pdf"), title="One Punch Man", author="ONE", year=2012,
                       series="One Punch Man", series_index=18.0, publisher="Panini",

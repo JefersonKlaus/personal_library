@@ -208,7 +208,7 @@ abre o histórico (ele abre sozinho quando há erro).
 ## Como a biblioteca lê os metadados
 
 Regras conferidas no código do Calibre (`calibre/ebooks/metadata/meta.py` e `opf2.py`); os
-nomes exigidos por ele ficam todos em `personal_library/library/manager.py`:
+nomes exigidos por ele ficam todos em `src/library/manager.py`:
 
 - Só é usado um `.opf` que tenha o identificador `opf:scheme="calibre"`. Sem ele, o arquivo
   é ignorado e valem os dados de dentro do PDF ("Microsoft Word - doc1", "admin"...).
@@ -237,33 +237,53 @@ nomes exigidos por ele ficam todos em `personal_library/library/manager.py`:
 
 ## Estrutura
 
-Cada módulo tem uma responsabilidade; as dependências vão de cima para baixo (a interface
-usa a lógica, a lógica não conhece a interface, e só `library/` conhece o programa externo).
+O código fica em `src/`, dividido em pastas por assunto. Cada pasta só usa as que estão
+abaixo dela:
+
+```
+ui/                        a interface
+importing/  exporting/     a lógica das abas Importar e Exportar
+library/                   a biblioteca de e-books
+parsing/  pdf/             nome do arquivo e conteúdo do PDF
+core/                      a base
+```
+
+A lógica não conhece a interface, e só `library/` conhece o programa externo. Única
+exceção à ordem: `core/settings.py` pega o nome do modelo padrão da Groq em
+`importing/groq_client.py`.
 
 ```
 pyproject.toml             projeto, dependências e configuração do `flet run`
 main.py                    ponto de entrada (o que o `flet run` executa)
-personal_library/
-  paths.py                 pastas do app (~/.personal_library)
-  settings.py              preferências (settings.json)
-  logging_setup.py         registro em arquivo
-  models.py                BookEntry, ImportOptions, Status
+src/
+  __init__.py              nome e versão do app
 
-  text.py                  limpeza de texto, nomes seguros de arquivo, busca sem acentos
-  people.py                nomes de pessoas: reconhecer, separar, ordenar
-  volumes.py               volumes no nome ("Vol 18", "v03")
-  filename_parser.py       modo automático: título/autor/volume do nome do arquivo
-  import_spec.py           "Como importar": @name - @vol; @auth=ONE
+  core/                    base usada por todo o app
+    paths.py               pastas do app (~/.personal_library)
+    settings.py            preferências (settings.json)
+    logging_setup.py       registro em arquivo
+    models.py              BookEntry, ImportOptions, Status
+    files.py               cópia verificada, espaço em disco, desfazer (manifesto)
+    text.py                limpeza de texto, nomes seguros de arquivo, busca sem acentos
 
-  pdf_reader.py            metadados de dentro do PDF (e o que é lixo)
-  pdf_cover.py             capa = 1ª página
-  analysis.py              achar PDFs, montar cada livro, duplicados
-  groq_client.py           cliente da API da Groq (esperas, novas tentativas, erros)
-  ai_metadata.py           "Usar Groq AI": pistas de cada PDF -> dados do livro
-  files.py                 cópia verificada, espaço em disco, desfazer (manifesto)
-  importer.py              PDFs revisados -> biblioteca (e desfazer)
-  exporter.py              biblioteca -> pasta com .opf e capa
-  renamer.py               renomear livros e séries (pela ferramenta da biblioteca)
+  parsing/                 dados do livro a partir do nome do arquivo
+    people.py              nomes de pessoas: reconhecer, separar, ordenar
+    volumes.py             volumes no nome ("Vol 18", "v03")
+    filename_parser.py     modo automático: título/autor/volume do nome do arquivo
+    import_spec.py         "Como importar": @name - @vol; @auth=ONE
+
+  pdf/                     leitura de PDFs
+    pdf_reader.py          metadados de dentro do PDF (e o que é lixo)
+    pdf_cover.py           capa = 1ª página
+
+  importing/               aba Importar (a lógica)
+    analysis.py            achar PDFs, montar cada livro, duplicados
+    groq_client.py         cliente da API da Groq (esperas, novas tentativas, erros)
+    ai_metadata.py         "Usar Groq AI": pistas de cada PDF -> dados do livro
+    importer.py            PDFs revisados -> biblioteca (e desfazer)
+
+  exporting/               aba Exportar (a lógica)
+    exporter.py            biblioteca -> pasta com .opf e capa
 
   library/                 a biblioteca de e-books
     manager.py             ÚNICO lugar com os nomes do programa externo
@@ -273,6 +293,7 @@ personal_library/
     opf.py                 formato .opf
     location.py            validar, achar e onde criar bibliotecas
     cli.py                 ferramenta de linha de comando: adicionar, remover, criar
+    renamer.py             renomear livros e séries (pela ferramenta da biblioteca)
 
   ui/                      interface Flet
     app.py                 janela, barra de status, tarefas e a biblioteca aberta

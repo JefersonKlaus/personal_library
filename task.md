@@ -1,22 +1,22 @@
-5:44
+0:20
 
-## What is the project?
-The project is a desktop system that convert PDF to calibre app using python. At this case 'convert' means, create a file that Calibe uses to manage the books. 
-The first goal is review the exportation process, because it is not working in the new calibre's version and ADD GROQ AI to help on the process.
-The second goal, is add the feature to be able to load the calibe documents in my app and to view them like it appears in the calibre app.
-The last goal, is refact to improve the code, applying KISS and SRP and of course, improve the tests.
+
 
 ## Task
-Preserve the current analysis, metadata review, organization, undo, and optional Calibre import flows. Add an in-app library view that reads the exported Calibre library and displays each book with its cover when available, title, author, language, tags, file location, and export status. Provide a refresh action after exporting or importing, show clear errors for invalid libraries or missing data, and handle empty libraries, duplicates, incomplete metadata, missing covers, and failed exports without reporting false success.
+The project is a desktop system that convert PDF to calibre app using python. At this case 'convert' means, create a file that Calibe uses to manage the books. 
+The first goal is create the options to update metadata of one book or many books.
+The second goal, is add the feature of convert PDF to EPUB
+The last goal, improve the usability, 
 
 ## How to judge completion
 
-Analyze and organize a set of PDFs, then open or refresh the new library view. Every exported book should appear in the calibre and all the calibre's galery needs to open in my app.
-So validate it you will need to run main.py script using FLET and test the app, and after that run pytest and see the result.
+Run the app (desktop) create a library,  and import more books fot it, after need choose a differente library and import book for it. With the library OK, you need to edit the metadata of ONE book, and after many books together. And finally be able to convert the PDF to EPUB format.
+After all the manual test, run the pytest.
 
 
 ## Notes
-This is a open source project that I started to automaticaly convert the PDF books to calibres format, you can find the code here https://github.com/JefersonKlaus/personal_library. This project is not working in the new calibre's version, so I need to fix it and add more features, like, using AI to create the metadas that Calibe uses, and be able to import the calibre's galery to my app and add more books and exrpot it back to calibre.
+This is a open source project that I started to automaticaly convert the PDF books to calibres format, you can find the code here https://github.com/JefersonKlaus/personal_library. Now this project is working as a personal library where I can import my books there and read theam.  But, after import my books I can not updatem them, so this task is to make it possible, and be possible convert the books to EPUB format.
+Now the app has 234 tests, so, probably I will add more.
 
 
 ## How to test

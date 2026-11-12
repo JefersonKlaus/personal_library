@@ -1,6 +1,6 @@
 import pytest
 
-from personal_library import pdf_cover
+from src.pdf import pdf_cover
 
 
 def test_render_cover_makes_jpeg(tmp_path, make_pdf):

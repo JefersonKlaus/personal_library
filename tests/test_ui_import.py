@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 from conftest import FakePicker, log_lines, open_library
 
-from personal_library import importer
-from personal_library.models import BookEntry, Status
+from src.importing import importer
+from src.core.models import BookEntry, Status
 
 
 def _sources(tmp_path, make_pdf):
@@ -253,7 +253,7 @@ def test_scan_with_ai_needs_the_key(app, tmp_path, make_pdf, monkeypatch):
 
 
 def test_scan_with_ai_fills_the_review_list(app, tmp_path, make_pdf, monkeypatch):
-    from personal_library.groq_client import GroqClient
+    from src.importing.groq_client import GroqClient
 
     sent = []
 
@@ -281,7 +281,7 @@ def test_scan_with_ai_fills_the_review_list(app, tmp_path, make_pdf, monkeypatch
 
 
 def test_ai_failure_keeps_the_app_guess(app, tmp_path, make_pdf, monkeypatch):
-    from personal_library.groq_client import GroqClient, GroqError
+    from src.importing.groq_client import GroqClient, GroqError
 
     def fake_chat(self, system, user, cancel=None):
         raise GroqError("Chave da API recusada", fatal=True)

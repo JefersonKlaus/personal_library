@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-from .text import normalize_text
+from ..core.text import normalize_text
 
 # Palavras minúsculas aceitas dentro de nomes de pessoas.
 _PARTICLES = {

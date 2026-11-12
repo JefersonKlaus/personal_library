@@ -14,8 +14,8 @@ import uuid
 from dataclasses import dataclass, field
 from xml.sax.saxutils import escape, quoteattr
 
-from ..people import author_sort
-from ..text import title_sort
+from ..parsing.people import author_sort
+from ..core.text import title_sort
 from .manager import OPF_META_PREFIX, OPF_TRUSTED_SCHEME
 
 # Códigos de 2 letras mais comuns convertidos para os de 3 que a biblioteca usa.

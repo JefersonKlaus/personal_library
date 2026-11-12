@@ -16,8 +16,8 @@ from typing import Callable
 
 from .analysis import WARNING_NOTES, flag_suspicious_values, normalize_authors
 from .groq_client import GroqClient, GroqError
-from .models import USABLE_STATUSES, BookEntry, Status
-from .pdf_reader import first_pages_text, is_junk_author, is_junk_title, read_pdf_info
+from ..core.models import USABLE_STATUSES, BookEntry, Status
+from ..pdf.pdf_reader import first_pages_text, is_junk_author, is_junk_title, read_pdf_info
 
 logger = logging.getLogger(__name__)
 ProgressFn = Callable[[int, int, str], None]

@@ -1,7 +1,7 @@
 import json
 
-from personal_library import settings
-from personal_library.models import ImportOptions
+from src.core import settings
+from src.core.models import ImportOptions
 
 
 def test_roundtrip(tmp_path):

@@ -2,8 +2,8 @@ import threading
 
 import pytest
 
-from personal_library import renamer
-from personal_library.library.database import LibraryBook
+from src.library import renamer
+from src.library.database import LibraryBook
 
 
 class FakeCli:

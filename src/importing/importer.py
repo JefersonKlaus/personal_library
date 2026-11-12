@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import Callable
 
 from .analysis import book_key, entry_key
-from .files import copy_verified
-from .library.cli import AddResult, LibraryCli
-from .library.database import LibraryError, load_library
-from .library.opf import OpfData, render_opf
-from .models import BookEntry, ImportOptions, Status
-from .paths import IMPORTS_DIR
-from .pdf_cover import render_cover
-from .text import book_stem
+from ..core.files import copy_verified
+from ..library.cli import AddResult, LibraryCli
+from ..library.database import LibraryError, load_library
+from ..library.opf import OpfData, render_opf
+from ..core.models import BookEntry, ImportOptions, Status
+from ..core.paths import IMPORTS_DIR
+from ..pdf.pdf_cover import render_cover
+from ..core.text import book_stem
 
 logger = logging.getLogger(__name__)
 ProgressFn = Callable[[int, int, str], None]
