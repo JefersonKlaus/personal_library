@@ -66,25 +66,48 @@ def _volume_badge(book: LibraryBook, cover: ft.Control) -> ft.Control:
     ])
 
 
-def book_card(book: LibraryBook, cover: bytes | None,
-              on_click: Callable[[Any], None]) -> ft.Control:
-    """Cartão da grade: capa, título (2 linhas) e autor."""
-    cover_control = cover_view(book, cover)
-    tooltip = f"{book.title}\n{book.authors_text}"
-    if book.series:
-        cover_control = _volume_badge(book, cover_control)
-        tooltip += f"\n{book.series_text}"
-    return ft.Container(
-        ink=True, border_radius=8, padding=6, tooltip=tooltip, on_click=on_click,
-        content=ft.Column(controls=[
-            cover_control,
-            # Altura fixa de 2 linhas: todas as capas da grade ficam do mesmo tamanho.
-            ft.Container(height=34, content=ft.Text(
-                book.title, size=12, weight=ft.FontWeight.BOLD, max_lines=2,
-                overflow=ft.TextOverflow.ELLIPSIS)),
-            ft.Text(book.authors_text, size=11, color=ft.Colors.GREY_700, max_lines=1,
-                    overflow=ft.TextOverflow.ELLIPSIS),
-        ], spacing=3, expand=True))
+Handler = Callable[[Any], Any]
+
+
+class BookCard:
+    """Cartão da grade: capa, título (2 linhas) e autor.
+
+    Como num gerenciador de arquivos: um clique só seleciona; dois cliques, ou botão
+    direito > Abrir, abrem a janela de detalhes."""
+
+    def __init__(self, book: LibraryBook, cover: bytes | None, selected: bool,
+                 on_select: Handler, on_open: Handler) -> None:
+        self.book = book
+        cover_control = cover_view(book, cover)
+        tooltip = f"{book.title}\n{book.authors_text}"
+        if book.series:
+            cover_control = _volume_badge(book, cover_control)
+            tooltip += f"\n{book.series_text}"
+        self.frame = ft.Container(
+            border_radius=8, padding=6, tooltip=tooltip,
+            content=ft.Column(controls=[
+                cover_control,
+                # Altura fixa de 2 linhas: todas as capas da grade ficam do mesmo tamanho.
+                ft.Container(height=34, content=ft.Text(
+                    book.title, size=12, weight=ft.FontWeight.BOLD, max_lines=2,
+                    overflow=ft.TextOverflow.ELLIPSIS)),
+                ft.Text(book.authors_text, size=11, color=ft.Colors.GREY_700, max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS),
+            ], spacing=3, expand=True))
+        self.set_selected(selected)
+        self.control = ft.ContextMenu(
+            content=ft.GestureDetector(content=self.frame, mouse_cursor=ft.MouseCursor.CLICK,
+                                       on_tap=on_select, on_double_tap=on_open,
+                                       on_secondary_tap_down=on_select),
+            secondary_items=[ft.PopupMenuItem(content="Abrir", icon=ft.Icons.OPEN_IN_NEW,
+                                              on_click=on_open)])
+
+    def set_selected(self, selected: bool) -> None:
+        self.selected = selected
+        # A borda existe sempre (transparente): selecionar não mexe no tamanho do cartão.
+        self.frame.bgcolor = ft.Colors.INDIGO_100 if selected else None
+        self.frame.border = ft.Border.all(
+            2, ft.Colors.INDIGO_400 if selected else ft.Colors.TRANSPARENT)
 
 
 def details_rows(book: LibraryBook) -> list[tuple[str, str]]:

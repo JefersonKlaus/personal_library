@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import flet as ft
 
-from .. import analysis, importer
+from .. import ai_metadata, analysis, importer
+from ..groq_client import DEFAULT_MODEL, GroqClient, resolve_api_key
 from ..import_spec import FIELD_LABELS, PATTERN_HELP, PatternError, apply_spec, compile_spec
 from ..library.manager import PRODUCT
 from ..models import BookEntry, ImportOptions, Status
@@ -57,6 +58,20 @@ class ImportTab:
         self.cb_author_first = ft.Checkbox(
             label="Automático: autor vem primeiro", value=opts.author_first,
             tooltip="Só vale sem padrão: 'Autor - Título' em vez de 'Título - Autor'.")
+        # IA (Groq): preenche os dados livro por livro
+        self.cb_ai = ft.Checkbox(label="Usar Groq AI para preencher os dados",
+                                 value=settings.ai_enabled, on_change=self.on_ai_toggle)
+        self.ai_key_field = ft.TextField(
+            label="Chave da API da Groq", value=settings.groq_api_key, password=True,
+            can_reveal_password=True, dense=True, expand=True,
+            hint_text="gsk_… (crie em console.groq.com)")
+        self.ai_model_field = ft.TextField(label="Modelo", value=settings.groq_model,
+                                           dense=True, width=260)
+        self.ai_hint = ft.Text(
+            "Ao analisar, cada PDF é enviado à Groq, um por vez: nome do arquivo, metadados, "
+            "número de páginas, o que o app deduziu e o texto das primeiras páginas (o PDF "
+            "em si não é enviado). A chave fica salva nas preferências deste computador.",
+            size=11, color=ft.Colors.GREY_700)
         # 2. Confira os dados
         self.pattern_field = ft.TextField(
             label="Como importar: parâmetros, delimitadores e valores fixos (vazio = automático)",
@@ -102,6 +117,8 @@ class ImportTab:
         ], vertical_alignment=ft.CrossAxisAlignment.CENTER)
         options = option_grid(self.cb_recursive, self.cb_dupes, self.cb_pdf_meta,
                               self.cb_author_first)
+        self.ai_row = ft.Row(controls=[self.ai_key_field, self.ai_model_field],
+                             vertical_alignment=ft.CrossAxisAlignment.CENTER)
         presets = ft.PopupMenuButton(
             content=ft.Row(controls=[ft.Text("Modelos", size=13),
                                      ft.Icon(ft.Icons.ARROW_DROP_DOWN)], tight=True, spacing=0),
@@ -121,7 +138,8 @@ class ImportTab:
                             vertical_alignment=ft.CrossAxisAlignment.CENTER)
         picker = self.app.library_picker
         return ft.Container(padding=12, expand=True, content=ft.Column(controls=[
-            section("1. Escolha os PDFs", pick_row, self.source_label, options),
+            section("1. Escolha os PDFs", pick_row, self.source_label, options, self.cb_ai,
+                    self.ai_row, self.ai_hint),
             section("2. Confira os dados (ajustados automaticamente)", pattern_row,
                     self.pattern_preview, review_actions, self.review_body, pager, expand=True),
             section("3. Importar para a biblioteca", picker.panel, import_row,
@@ -130,6 +148,7 @@ class ImportTab:
 
     def refresh(self) -> None:
         """Atualiza tudo o que depende do estado (fontes, padrão, lista, biblioteca)."""
+        self._show_ai_fields()
         self._update_sources_label()
         self.update_pattern_preview()
         self.refresh_list()
@@ -152,7 +171,47 @@ class ImportTab:
     def store(self, settings: Settings) -> None:
         settings.last_sources = [str(path) for path in self.sources]
         settings.cli_path = (self.cli_field.value or "").strip()
+        settings.ai_enabled = bool(self.cb_ai.value)
+        settings.groq_api_key = (self.ai_key_field.value or "").strip()
+        settings.groq_model = (self.ai_model_field.value or "").strip() or DEFAULT_MODEL
         settings.set_options(self.options)
+
+    # ================================================================== IA (Groq)
+
+    def _show_ai_fields(self) -> None:
+        self.ai_row.visible = self.ai_hint.visible = bool(self.cb_ai.value)
+
+    def on_ai_toggle(self, _event: Any) -> None:
+        self._show_ai_fields()
+        self.app.save()
+        self.app.page.update()
+
+    def groq_client(self) -> GroqClient | None:
+        """O cliente da Groq se "Usar Groq AI" está marcado; None se não está.
+
+        Levanta ValueError (mensagem pronta) se falta a chave."""
+        if not self.cb_ai.value:
+            return None
+        key = resolve_api_key(self.ai_key_field.value or "")
+        if not key:
+            raise ValueError("Informe a chave da API da Groq (ou desmarque Usar Groq AI).")
+        return GroqClient(key, (self.ai_model_field.value or "").strip() or DEFAULT_MODEL)
+
+    async def _fill_with_ai(self, entries: list[BookEntry], client: GroqClient,
+                            options: ImportOptions) -> str:
+        """Consulta a IA livro por livro; devolve o resumo para a mensagem final."""
+        spec = compile_spec(options.filename_pattern)
+        fixed = spec.fixed if spec is not None else {}
+        report = await self.app.run_job(ai_metadata.fill_with_ai, entries, client, fixed,
+                                        options.unknown_author, label="Consultando a IA")
+        for error in report.errors[:20]:
+            self.app.log(f"  ✗ {error}", True)
+        if report.stopped:
+            self.app.log(f"IA interrompida: {report.stopped}", True)
+        message = f"IA: {report.done} de {report.total} preenchido(s)"
+        if report.failed:
+            message += f", {report.failed} sem resposta (ficaram com os dados do app)"
+        return message + (" (cancelado)" if report.cancelled else "")
 
     def refresh_library(self) -> None:
         """A ferramenta da biblioteca foi achada? E o botão Importar pode ser usado?"""
@@ -396,6 +455,11 @@ class ImportTab:
             return
         options = self.collect_options()
         self.app.save()
+        try:
+            client = self.groq_client()
+        except ValueError as exc:
+            self.app.log(str(exc), True)
+            return
         exclude = self.app.library  # nunca relê a própria biblioteca
         try:
             files = await asyncio.to_thread(analysis.find_pdfs, self.sources, options.recursive,
@@ -410,11 +474,16 @@ class ImportTab:
             logger.exception("Falha na análise")
             self.app.log(f"Erro na análise: {exc}", True)
             return
-        duplicates = analysis.mark_duplicates(entries, options)
+        # Cópias idênticas antes da IA (não manda o mesmo PDF duas vezes); "mesmo livro em
+        # arquivos diferentes" depois, porque depende dos títulos que a IA devolver.
+        duplicates = analysis.mark_identical_files(entries, options)
         self.entries, self.page_index = entries, 0
+        ai_summary = await self._fill_with_ai(entries, client, options) if client else ""
+        analysis.warn_same_book(entries)
         self.update_pattern_preview()
-        self.app.log(f"{len(entries)} PDF(s) analisados, {duplicates} duplicado(s). Confira "
-                     "título e autor e clique em Importar para a biblioteca.")
+        self.app.log(f"{len(entries)} PDF(s) analisados, {duplicates} duplicado(s)"
+                     f"{'. ' + ai_summary if ai_summary else ''}. Confira os dados e clique em "
+                     "Importar para a biblioteca.")
         self.refresh_list()
 
     async def on_import(self, _event: Any) -> None:

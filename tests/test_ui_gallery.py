@@ -59,6 +59,53 @@ def test_details_dialog_opens_book(app, ui, make_library, tmp_path, monkeypatch)
     assert app.page.dialogs == []
 
 
+def _gestures(card):
+    """O que o cartão faz com o mouse: (clique, duplo clique, botão direito > Abrir)."""
+    detector = card.control.content
+    [open_item] = card.control.secondary_items
+    assert open_item.content == "Abrir"
+    return detector.on_tap, detector.on_double_tap, open_item.on_click
+
+
+def test_one_click_only_selects(app, make_library, tmp_path):
+    open_library(app, make_library, tmp_path)
+    gallery = app.gallery
+    first, second = gallery.cards[0], gallery.cards[1]
+    assert not any(card.selected for card in gallery.cards)
+    _gestures(first)[0](None)
+    assert first.selected and gallery.selected_id == first.book.id
+    assert app.page.dialogs == []  # um clique não abre nada
+    _gestures(second)[0](None)
+    assert second.selected and not first.selected  # só um selecionado por vez
+    assert [card.selected for card in gallery.cards].count(True) == 1
+    first.control.content.on_secondary_tap_down(None)  # botão direito também seleciona
+    assert first.selected and not second.selected and app.page.dialogs == []
+
+
+def test_double_click_or_right_click_open_opens_the_details(app, make_library, tmp_path):
+    open_library(app, make_library, tmp_path)
+    gallery = app.gallery
+    card = gallery.cards[2]
+    _gestures(card)[1](None)  # dois cliques
+    assert len(app.page.dialogs) == 1 and card.selected
+    assert app.page.dialogs[0].title.controls[0].value == card.book.title
+    app.page.pop_dialog()
+    other = gallery.cards[0]
+    _gestures(other)[2](None)  # botão direito > Abrir
+    assert app.page.dialogs[0].title.controls[0].value == other.book.title
+    assert other.selected and not card.selected
+
+
+def test_selection_survives_search_and_sort(app, make_library, tmp_path):
+    open_library(app, make_library, tmp_path)
+    gallery = app.gallery
+    book_id = gallery.cards[1].book.id
+    _gestures(gallery.cards[1])[0](None)
+    gallery.sort_dropdown.value = "title"
+    asyncio.run(gallery.on_sort(None))  # grade redesenhada
+    assert [card.book.id for card in gallery.cards if card.selected] == [book_id]
+
+
 def test_pagination(app, ui, make_library, tmp_path, monkeypatch):
     monkeypatch.setattr(ui.gallery_tab, "GALLERY_PAGE_SIZE", 3)
     open_library(app, make_library, tmp_path)

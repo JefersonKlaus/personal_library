@@ -105,3 +105,23 @@ def read_pdf_info(path: Path) -> PdfInfo:
         info.readable = False
         info.error = f"{type(exc).__name__}: {exc}"
     return info
+
+
+def first_pages_text(path: Path, pages: int = 3, max_chars: int = 2500) -> str:
+    """Texto das primeiras páginas (capa, folha de rosto, ficha catalográfica).
+
+    Limitado para a consulta à IA ficar pequena. PDFs escaneados (só imagem) ou
+    protegidos devolvem "" e a IA usa só o nome do arquivo e os metadados.
+    """
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path), strict=False)
+        if reader.is_encrypted and not reader.decrypt(""):
+            return ""
+        text = "\n".join((page.extract_text() or "") for page in reader.pages[:pages])
+    except Exception as exc:  # arquivo ruim: a IA trabalha sem o texto
+        logger.info("Sem texto de %s: %s", path, exc)
+        return ""
+    text = re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", text)).strip()
+    return text[:max_chars]

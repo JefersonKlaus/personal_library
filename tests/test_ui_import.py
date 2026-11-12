@@ -224,3 +224,75 @@ def test_undo_import(app, tmp_path, make_library, fake_cli, monkeypatch):
     asyncio.run(tab.on_undo_import(None))
     assert entry.status is Status.READY and entry.notes == []
     assert any("Importação desfeita: 1" in line for line in log_lines(app))
+
+
+# ---------------------------------------------------------------- Groq AI
+
+def test_ai_fields_follow_the_checkbox(app):
+    tab = app.import_tab
+    assert not tab.cb_ai.value and not tab.ai_row.visible and not tab.ai_hint.visible
+    tab.cb_ai.value = True
+    tab.on_ai_toggle(None)
+    assert tab.ai_row.visible and tab.ai_hint.visible
+    tab.ai_key_field.value = " gsk_abc "
+    tab.ai_model_field.value = ""
+    tab.store(app.settings)
+    assert app.settings.ai_enabled and app.settings.groq_api_key == "gsk_abc"
+    assert app.settings.groq_model == "llama-3.3-70b-versatile"  # vazio = modelo padrão
+
+
+def test_scan_with_ai_needs_the_key(app, tmp_path, make_pdf, monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    tab = app.import_tab
+    tab.sources = [_sources(tmp_path, make_pdf)]
+    tab.cb_ai.value = True
+    tab.ai_key_field.value = ""
+    asyncio.run(tab.on_scan(None))
+    assert any("Informe a chave da API da Groq" in line for line in log_lines(app))
+    assert tab.entries == []  # não analisou nada
+
+
+def test_scan_with_ai_fills_the_review_list(app, tmp_path, make_pdf, monkeypatch):
+    from personal_library.groq_client import GroqClient
+
+    sent = []
+
+    def fake_chat(self, system, user, cancel=None):
+        sent.append((self.api_key, user))
+        return {"title": "Título da IA", "authors": ["Ana Souza"], "series": "Coleção",
+                "volume": 2, "year": 2001, "publisher": "Editora", "language": "pt",
+                "confidence": 0.9}
+
+    monkeypatch.setattr(GroqClient, "chat_json", fake_chat)
+    tab = app.import_tab
+    src = tmp_path / "src"
+    make_pdf(src / "arquivo qualquer.pdf", text="Primeira página do livro")
+    tab.sources = [src]
+    tab.cb_ai.value = True
+    tab.ai_key_field.value = "gsk_teste"
+    asyncio.run(tab.on_scan(None))
+    [entry] = tab.entries
+    assert (entry.title, entry.author, entry.series, entry.series_index) == (
+        "Título da IA", "Ana Souza", "Coleção", 2)
+    assert entry.status is Status.READY
+    assert any("preenchido pela IA" in note for note in entry.notes)
+    assert len(sent) == 1 and sent[0][0] == "gsk_teste" and "Primeira página" in sent[0][1]
+    assert any("IA: 1 de 1 preenchido(s)" in line for line in log_lines(app))
+
+
+def test_ai_failure_keeps_the_app_guess(app, tmp_path, make_pdf, monkeypatch):
+    from personal_library.groq_client import GroqClient, GroqError
+
+    def fake_chat(self, system, user, cancel=None):
+        raise GroqError("Chave da API recusada", fatal=True)
+
+    monkeypatch.setattr(GroqClient, "chat_json", fake_chat)
+    tab = app.import_tab
+    tab.sources = [_sources(tmp_path, make_pdf)]
+    tab.cb_ai.value = True
+    tab.ai_key_field.value = "gsk_errada"
+    asyncio.run(tab.on_scan(None))
+    assert sorted(e.title for e in tab.entries) == ["Livro Dois", "Livro Um", "copia"]
+    lines = log_lines(app)
+    assert any("IA interrompida" in line and "recusada" in line for line in lines)
+    assert any("IA: 0 de" in line for line in lines)

@@ -27,7 +27,9 @@ from .text import fold, natural_key
 from .volumes import looks_like_volume
 
 ProgressFn = Callable[[int, int, str], None]
-_WARNING_NOTES = ("nome fora do padrão", "o autor", "o título")
+_SUSPICIOUS_NOTES = ("nome fora do padrão", "o autor", "o título")
+# Observações que deixam o livro com "atenção" (e que o usuário deve conferir).
+WARNING_NOTES = _SUSPICIOUS_NOTES + ("autor não encontrado", "PDF protegido", "mesmo título")
 
 
 # ---------------------------------------------------------------- arquivos
@@ -83,8 +85,8 @@ def build_entry(path: Path, options: ImportOptions) -> BookEntry:
         entry.author, entry.author_origin = fixed["author"], "fixo"
     if parsed.language:
         entry.language = parsed.language
-    _flag_suspicious_values(entry)
-    _normalize_authors(entry, options.unknown_author)
+    flag_suspicious_values(entry)
+    normalize_authors(entry, options.unknown_author)
     try:
         entry.sha256 = sha256_file(path)
     except OSError as exc:
@@ -149,16 +151,17 @@ def _apply_pdf_info(entry: BookEntry, info: PdfInfo, options: ImportOptions,
         entry.author, entry.author_origin = pdf_author, "pdf"
 
 
-def _flag_suspicious_values(entry: BookEntry) -> None:
+def flag_suspicious_values(entry: BookEntry) -> None:
     """'@name - @auth' em 'One Punch Man - Vol 01' põe 'Vol 01' no autor: avisa."""
     for label, value in (("autor", entry.author), ("título", entry.title)):
         if looks_like_volume(value):
             entry.note(f"o {label} '{value}' parece um volume: confira o padrão (use @vol)")
-    if entry.status is Status.READY and any(n.startswith(_WARNING_NOTES) for n in entry.notes):
+    if entry.status is Status.READY and any(n.startswith(_SUSPICIOUS_NOTES)
+                                            for n in entry.notes):
         entry.status = Status.WARNING
 
 
-def _normalize_authors(entry: BookEntry, unknown_author: str) -> None:
+def normalize_authors(entry: BookEntry, unknown_author: str) -> None:
     """'Assis, Machado de; Outro' -> 'Machado de Assis & Outro' (ou autor desconhecido)."""
     names = split_authors(entry.author)
     if names:
@@ -211,9 +214,15 @@ def entry_key(entry: BookEntry) -> tuple:
 
 
 def mark_duplicates(entries: list[BookEntry], options: ImportOptions) -> int:
-    """Marca cópias idênticas (mesmo conteúdo) e avisa sobre o mesmo livro em arquivos
-    diferentes. Entre cópias idênticas fica a de melhor metadado. Devolve quantos
-    arquivos foram marcados como duplicados."""
+    """Marca cópias idênticas e avisa sobre o mesmo livro em arquivos diferentes.
+    Devolve quantos arquivos foram marcados como duplicados."""
+    duplicates = mark_identical_files(entries, options)
+    warn_same_book(entries)
+    return duplicates
+
+
+def mark_identical_files(entries: list[BookEntry], options: ImportOptions) -> int:
+    """Cópias com o mesmo conteúdo: fica a de melhor metadado, as outras são marcadas."""
     def quality(entry: BookEntry) -> tuple[bool, bool, bool]:
         return (entry.author != options.unknown_author, entry.author_origin == "pdf",
                 entry.title_origin == "pdf")
@@ -222,24 +231,29 @@ def mark_duplicates(entries: list[BookEntry], options: ImportOptions) -> int:
     for entry in entries:
         if entry.status in USABLE_STATUSES and entry.sha256:
             groups.setdefault(entry.sha256, []).append(entry)
-    duplicates, survivors = 0, set()
+    duplicates = 0
     for group in groups.values():
         best = max(group, key=quality)
-        survivors.add(id(best))
         for entry in (item for item in group if item is not best):
             duplicates += 1
             if options.skip_duplicates:
                 entry.fail(f"idêntico a {best.source.name}", Status.DUPLICATE)
             else:
                 entry.note(f"idêntico a {best.source.name}")
+    return duplicates
 
+
+def warn_same_book(entries: list[BookEntry]) -> None:
+    """Mesmo título, autor e volume em arquivos diferentes: avisa (pode ser o mesmo livro)."""
     first_by_key: dict[tuple, BookEntry] = {}
-    for entry in (item for item in entries if id(item) in survivors):
+    for entry in entries:
+        if entry.status not in USABLE_STATUSES or any(n.startswith("idêntico a")
+                                                      for n in entry.notes):
+            continue
         other = first_by_key.setdefault(entry_key(entry), entry)
         if other is not entry:
             entry.status = Status.WARNING
             entry.note(f"mesmo título, autor e volume de {other.source.name} (arquivo diferente)")
-    return duplicates
 
 
 def summarize(entries: Iterable[BookEntry]) -> Counter:

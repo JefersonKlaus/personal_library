@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+from .groq_client import DEFAULT_MODEL
 from .models import ImportOptions
 from .paths import SETTINGS_FILE
 
@@ -24,6 +25,9 @@ class Settings:
     export_folder_per_book: bool = True
     export_opf: bool = True
     export_cover: bool = True
+    ai_enabled: bool = False  # "Usar Groq AI" na aba Importar
+    groq_api_key: str = ""  # guardada em texto puro no settings.json do usuário
+    groq_model: str = DEFAULT_MODEL
     last_sources: list[str] = field(default_factory=list)
     options: dict[str, Any] = field(default_factory=dict)
 

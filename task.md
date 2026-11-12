@@ -1,3 +1,5 @@
+5:44
+
 ## What is the project?
 The project is a desktop system that convert PDF to calibre app using python. At this case 'convert' means, create a file that Calibe uses to manage the books. 
 The first goal is review the exportation process, because it is not working in the new calibre's version and ADD GROQ AI to help on the process.
@@ -19,16 +21,23 @@ This is a open source project that I started to automaticaly convert the PDF boo
 
 ## How to test
 
-```powershell
-cd D:\codigo\personal_library
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-python main.py
-```
+O ran the and i test it manually, adding PDFs, analyzing and reviwing the metadata, I created a new library and imported many PDFs. After I got a existent library and imported new books in there. Alfter that I ran pytest.
 
-Manually test the complete flow: add PDFs, analyze and review metadata, simulate, organize, optionally import into Calibre, and refresh the library view. Also test invalid or empty libraries, missing covers and metadata, failed exports, and undo.
+SETUP:
+cd workspace/personal_library
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+
+ACTION: flet run
+RESULT: The app opened and I used it
+
+ACTION: pytest
+RESULT: 234 passed, 5 skipped in 12.7
+
+
+O ran the and i test it manually, adding PDFs, analyzing and reviwing the metadata, I created a new library and imported many PDFs. After I got a existent library and imported new books in there. Alfter that I ran pytest.
 
 Run the automated tests:
 

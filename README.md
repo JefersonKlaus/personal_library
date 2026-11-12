@@ -58,6 +58,31 @@ importar). Preferências, registro e miniaturas da galeria ficam em `~/.personal
 > de e-books), **feche-o antes de importar**: enquanto isso, a ferramenta da biblioteca recusa o
 > acesso, e o app avisa "A biblioteca está sendo usada por outro programa".
 
+#### Usar Groq AI para preencher os dados (opcional)
+
+Para nomes de arquivo sem padrão (`scan_0042.pdf`, `livro final v2.pdf`), marque
+**Usar Groq AI para preencher os dados** e informe a **chave da API da Groq** (crie uma
+grátis em <https://console.groq.com/keys>). Ao **Analisar**, o app primeiro deduz os dados
+como sempre e depois pergunta à IA, **um livro por vez**, título, autores, série, volume,
+ano, editora e idioma. O resultado aparece na mesma lista de conferência: edite o que
+precisar e clique em **Importar para a biblioteca**, como num import normal.
+
+- **O que é enviado**: nome do arquivo, título/autor de dentro do PDF, número de páginas,
+  o que o app já deduziu e o texto das 3 primeiras páginas (até 2.500 caracteres). O arquivo
+  PDF em si não é enviado. PDFs só de imagem (escaneados) não têm texto: a IA usa só o resto.
+- **Regras**: valores fixos de "Como importar" (`@auth=ONE`) sempre vencem a IA; o que a IA
+  não souber mantém o que o app deduziu. Cada livro mostra "preenchido pela IA (N% de
+  confiança)"; abaixo de 50% ele fica em **atenção** para você conferir. Se a IA não
+  responder a um livro, ele fica com os dados do app e em **atenção**.
+- **Chave**: fica salva nas preferências (`~/.personal_library/settings.json`, em texto
+  simples). Se preferir não salvá-la, deixe o campo vazio e defina a variável de ambiente
+  `GROQ_API_KEY`.
+- **Modelo**: padrão `llama-3.3-70b-versatile`. Se a Groq desativar esse modelo, o app avisa;
+  troque no campo **Modelo** por um da lista em <https://console.groq.com/docs/models>.
+- **Limites do plano grátis**: quando a Groq pede para esperar (erro 429), o app espera o
+  tempo indicado e tenta de novo (até 4 vezes). Chave recusada ou sem conexão interrompem a
+  consulta; os livros já analisados continuam na lista. **Cancelar** para a qualquer momento.
+
 #### Qual biblioteca recebe os livros
 
 Se nenhuma biblioteca foi escolhida ainda (ou a escolhida foi apagada/movida), o item 3 mostra
@@ -147,8 +172,10 @@ diferenciar acentos) e ordem (mais recentes, título, série e volume, autor, pu
 - **Renomear série**: o lápis pequeno ao lado da série. Muda a série em todos os livros dela
   e, se quiser, também os títulos iguais ao nome antigo (volumes importados com `@name`). Se
   o nome novo já for de outra série, os livros passam para ela (a janela avisa).
-- **Detalhes do livro**: clique na capa. O lápis pequeno ao lado do título renomeia o livro
-  (✓ salva, ✕ cancela); **Abrir livro** abre o PDF.
+- **Selecionar e abrir** (como num gerenciador de arquivos): **um clique** só seleciona o
+  livro (fica destacado); **dois cliques**, ou **botão direito > Abrir**, abrem a janela de
+  detalhes. Nela, o lápis pequeno ao lado do título renomeia o livro (✓ salva, ✕ cancela) e
+  **Abrir livro** abre o PDF.
 
 Para ver, a galeria só lê a biblioteca (banco aberto em modo somente leitura) e funciona com
 o Calibre aberto. Renomear passa pela ferramenta da biblioteca (`calibredb`), como a
@@ -205,7 +232,8 @@ nomes exigidos por ele ficam todos em `personal_library/library/manager.py`:
   lê o banco de dados dela (em modo somente leitura).
 - Desfazer nunca sobrescreve arquivos; importações desfeitas vão para a lixeira do Calibre.
 - Se o disco não tiver espaço para o lote, nada é copiado.
-- Nenhum PDF sai do seu computador; não há rede nem telemetria.
+- Nenhum PDF sai do seu computador e não há telemetria. O app só usa a rede se você marcar
+  **Usar Groq AI**: nesse caso, as pistas em texto de cada livro (veja acima) vão para a Groq.
 
 ## Estrutura
 
@@ -230,6 +258,8 @@ personal_library/
   pdf_reader.py            metadados de dentro do PDF (e o que é lixo)
   pdf_cover.py             capa = 1ª página
   analysis.py              achar PDFs, montar cada livro, duplicados
+  groq_client.py           cliente da API da Groq (esperas, novas tentativas, erros)
+  ai_metadata.py           "Usar Groq AI": pistas de cada PDF -> dados do livro
   files.py                 cópia verificada, espaço em disco, desfazer (manifesto)
   importer.py              PDFs revisados -> biblioteca (e desfazer)
   exporter.py              biblioteca -> pasta com .opf e capa
@@ -251,7 +281,7 @@ personal_library/
     import_tab.py          aba Importar
     gallery_tab.py         aba Galeria
     series_sidebar.py      barra lateral de séries (filtrar e renomear)
-    book_views.py          capa, cartão e detalhes de um livro
+    book_views.py          capa, cartão (seleção, abrir) e detalhes de um livro
     export_tab.py          aba Exportar
 tests/                     pytest: um arquivo por módulo (test_ui_*: ligação da interface)
 ```
@@ -269,6 +299,7 @@ aparência nem a compatibilidade com a versão instalada do Flet. Abra o app e t
 ## Limites conhecidos
 
 - A leitura de autor pelo nome do arquivo é uma heurística: confira a lista antes de importar.
+- A IA também erra (e pode "inventar"): confira a lista, principalmente os livros em atenção.
 - Listas de autores separadas só por vírgula (`Silva, Souza, Lima`) não são divididas; use `&`.
 - A ferramenta da biblioteca recusa o acesso enquanto outro programa a usa (feche-o para
   importar).

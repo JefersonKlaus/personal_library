@@ -15,7 +15,7 @@ from ..library.thumbnails import thumbnail
 from ..paths import THUMBS_DIR
 from ..renamer import RenameError, rename_book, rename_series
 from ..settings import Settings
-from .book_views import BookDetailsDialog, book_card, open_path
+from .book_views import BookCard, BookDetailsDialog, open_path
 from .series_sidebar import SeriesSidebar
 from .widgets import page_count, pager_controls, update_pager
 
@@ -34,6 +34,8 @@ class GalleryTab:
         self.view: list[LibraryBook] = []  # depois da busca e da ordem
         self.page_index = 0
         self._render_seq = 0  # descarta renderizações que ficaram velhas
+        self.cards: list[BookCard] = []  # os cartões da página atual
+        self.selected_id: int | None = None  # o livro selecionado (um clique)
         self.thumb_cache: Path | None = THUMBS_DIR
         self.library_field = ft.TextField(
             label="Biblioteca (pasta da biblioteca)", value=app.settings.library, dense=True,
@@ -174,9 +176,8 @@ class GalleryTab:
                              if self.sidebar.selected is not None
                              else "Nenhum livro encontrado para essa busca.")
             return
-        self.grid.controls = [
-            book_card(book, cover, lambda _e, b=book, c=cover: self.show_details(b, c))
-            for book, cover in zip(chunk, covers)]
+        self.cards = [self._card(book, cover) for book, cover in zip(chunk, covers)]
+        self.grid.controls = [card.control for card in self.cards]
         self.body.controls = [self.grid]
         shown = f"{len(self.view)} de {len(books)}" if len(self.view) != len(books) \
             else f"{len(books)}"
@@ -185,7 +186,23 @@ class GalleryTab:
                      page_count(len(self.view), GALLERY_PAGE_SIZE))
         self.app.page.update()
 
-    # ------------------------------------------------------------------ detalhes
+    # ------------------------------------------------------------------ seleção e detalhes
+
+    def _card(self, book: LibraryBook, cover: bytes | None) -> BookCard:
+        def on_open(_event: Any) -> None:
+            self.select(book.id)
+            self.show_details(book, cover)
+
+        return BookCard(book, cover, book.id == self.selected_id,
+                        on_select=lambda _e: self.select(book.id), on_open=on_open)
+
+    def select(self, book_id: int) -> None:
+        """Um clique: destaca o livro (só os cartões que mudam são redesenhados)."""
+        self.selected_id = book_id
+        for card in self.cards:
+            if card.selected != (card.book.id == book_id):
+                card.set_selected(not card.selected)
+        self.app.page.update()
 
     def show_details(self, book: LibraryBook, cover: bytes | None) -> None:
         page = self.app.page

@@ -68,6 +68,10 @@ class PersonalLibraryApp:
         if registry is None:  # versões antigas do Flet usam overlay
             registry = self.page.overlay
         registry.append(self.file_picker)
+        if getattr(self.page, "web", False):
+            # No navegador, o botão direito mostraria o menu do navegador, não o da galeria.
+            self.browser_menu = ft.BrowserContextMenu()
+            registry.append(self.browser_menu)
         self.tabs = ft.Tabs(
             length=3, selected_index=TAB_IMPORT, expand=True,
             content=ft.Column(expand=True, controls=[
@@ -94,6 +98,17 @@ class PersonalLibraryApp:
         self.import_tab.refresh()
         self.export_tab.refresh()
         self.page.update()
+
+    async def use_app_context_menus(self) -> None:
+        """Só na versão web: desliga o menu do navegador (senão o "Abrir" da galeria não
+        aparece com o botão direito). No app de desktop não há o que fazer."""
+        menu = getattr(self, "browser_menu", None)
+        if menu is None:
+            return
+        try:
+            await menu.disable()
+        except Exception:
+            logger.debug("não foi possível desligar o menu do navegador", exc_info=True)
 
     async def go_to_tab(self, index: int) -> None:
         self.tabs.selected_index = index
@@ -228,5 +243,6 @@ async def main(page: ft.Page) -> None:
         logger.debug("window não configurável", exc_info=True)
     app = PersonalLibraryApp(page)
     app.build()
+    await app.use_app_context_menus()
     if app.settings.library:
         await app.open_library(app.settings.library)
