@@ -1,8 +1,8 @@
-"""Leitura somente leitura da biblioteca: o banco de dados e as pastas dos livros.
+"""Read-only access to the library: the database and the book folders.
 
-Cada livro fica numa pasta `Autor/Título (id)/` com os arquivos e `cover.jpg`; os
-metadados ficam no banco SQLite da biblioteca. O banco é aberto em modo `ro`,
-então nada aqui altera a biblioteca.
+Each book lives in an `Author/Title (id)/` folder with the files and `cover.jpg`; the
+metadata lives in the library's SQLite database. The database is opened in `ro` mode,
+so nothing here changes the library.
 """
 from __future__ import annotations
 
@@ -19,19 +19,19 @@ logger = logging.getLogger(__name__)
 
 
 class LibraryError(Exception):
-    """A pasta não é uma biblioteca ou o banco não pôde ser lido."""
+    """The folder is not a library or the database could not be read."""
 
 
 @dataclass
 class LibraryBook:
-    """Um livro da biblioteca."""
+    """A book of the library."""
 
     id: int
     title: str
     authors: list[str] = field(default_factory=list)
     title_sort: str = ""
     author_sort: str = ""
-    path: str = ""  # pasta relativa à biblioteca, sempre com '/'
+    path: str = ""  # folder relative to the library, always with '/'
     has_cover: bool = False
     added: datetime | None = None
     pubdate: datetime | None = None
@@ -40,7 +40,7 @@ class LibraryBook:
     publisher: str = ""
     tags: list[str] = field(default_factory=list)
     languages: list[str] = field(default_factory=list)
-    formats: dict[str, str] = field(default_factory=dict)  # 'PDF' -> nome do arquivo
+    formats: dict[str, str] = field(default_factory=dict)  # 'PDF' -> name of the file
     identifiers: dict[str, str] = field(default_factory=dict)
     comments: str = ""
 
@@ -50,11 +50,11 @@ class LibraryBook:
 
     @property
     def year(self) -> int | None:
-        """Ano de publicação no fuso local (a biblioteca guarda em UTC)."""
+        """Publication year in the local time zone (the library stores it in UTC)."""
         if self.pubdate is None:
             return None
-        # Soma o deslocamento atual em vez de astimezone(): no Windows,
-        # astimezone() falha para datas antes de 1970 (livros antigos).
+        # Adds the current offset instead of astimezone(): on Windows,
+        # astimezone() fails for dates before 1970 (old books).
         offset = datetime.now().astimezone().utcoffset() or timedelta()
         return (self.pubdate + offset).year
 
@@ -81,7 +81,7 @@ class LibraryBook:
         return self.folder(library) / f"{name}.{fmt.lower()}"
 
     def main_file(self, library: Path) -> Path | None:
-        """O arquivo para abrir: PDF se houver, senão o primeiro formato existente."""
+        """The file to open: the PDF if there is one, otherwise the first format present."""
         order = sorted(self.formats, key=lambda fmt: (fmt != "PDF", fmt))
         for fmt in order:
             path = self.format_path(library, fmt)
@@ -90,10 +90,10 @@ class LibraryBook:
         return None
 
 
-# ---------------------------------------------------------------- leitura
+# ---------------------------------------------------------------- reading
 
 def _parse_date(raw: object) -> datetime | None:
-    """Datas da biblioteca: '2024-05-01 10:00:00.123+00:00'; ano 101 = indefinida."""
+    """Library dates: '2024-05-01 10:00:00.123+00:00'; year 101 = undefined."""
     if not raw:
         return None
     try:
@@ -108,11 +108,11 @@ def _connect(library: Path) -> sqlite3.Connection:
     if not db.is_file():
         raise LibraryError(f"{library} não é uma biblioteca (falta o {DATABASE_FILE}).")
     try:
-        # Somente leitura: nada que o app faça pode alterar a biblioteca.
+        # Read-only: nothing the app does can change the library.
         conn = sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True, timeout=10)
     except sqlite3.Error:
-        # URIs de compartilhamentos de rede (\\servidor\pasta) não são aceitas pelo
-        # SQLite; abre pelo caminho e bloqueia qualquer escrita com query_only.
+        # URIs of network shares (\\server\folder) are not accepted by
+        # SQLite; opens by path and blocks any write with query_only.
         try:
             conn = sqlite3.connect(str(db), timeout=10)
             conn.execute("PRAGMA query_only = ON")
@@ -131,7 +131,7 @@ def _tables(conn: sqlite3.Connection) -> set[str]:
 
 
 def load_library(library: Path | str) -> list[LibraryBook]:
-    """Lê todos os livros da biblioteca (sem alterar nada)."""
+    """Reads every book of the library (without changing anything)."""
     library = Path(library)
     conn = _connect(library)
     try:

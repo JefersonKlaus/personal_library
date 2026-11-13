@@ -1,4 +1,4 @@
-"""Renomear livros e séries da biblioteca (pela ferramenta da biblioteca)."""
+"""Renaming books and series of the library (through the library tool)."""
 from __future__ import annotations
 
 import threading
@@ -14,11 +14,11 @@ ProgressFn = Callable[[int, int, str], None]
 
 
 class RenameError(ValueError):
-    """Nome inválido (mensagem pronta para mostrar)."""
+    """Invalid name (message ready to be shown)."""
 
 
 def clean_name(text: str | None, what: str) -> str:
-    """Tira espaços repetidos; nome vazio não é aceito."""
+    """Collapses repeated spaces; an empty name is not accepted."""
     name = normalize_text(text or "")
     if not name:
         raise RenameError(f"O nome {what} não pode ficar vazio.")
@@ -26,13 +26,13 @@ def clean_name(text: str | None, what: str) -> str:
 
 
 def title_fields(title: str) -> dict[str, str]:
-    """Título e ordenação juntos: só o título deixaria a ordenação antiga
-    ('O Hobbit' continuaria ordenado como 'Hobbit, The')."""
+    """Title and sort name together: the title alone would keep the old sort name
+    ('O Hobbit' would still be sorted as 'Hobbit, The')."""
     return {"title": title, "sort": title_sort(title)}
 
 
 def rename_book(cli: LibraryCli, library: Path, book: LibraryBook, new_title: str) -> tuple[bool, str]:
-    """Renomeia um livro. Devolve (ok, erro)."""
+    """Renames a book. Returns (ok, error)."""
     title = clean_name(new_title, "do livro")
     if title == book.title:
         return True, ""
@@ -40,7 +40,7 @@ def rename_book(cli: LibraryCli, library: Path, book: LibraryBook, new_title: st
 
 
 def titles_like_series(books: list[LibraryBook], series: str) -> int:
-    """Quantos livros da série têm o título igual ao nome dela (volumes importados)."""
+    """How many books of the series have the same title as the series name (imported volumes)."""
     return sum(1 for book in books if book.series == series and fold(book.title) == fold(series))
 
 
@@ -56,10 +56,10 @@ class RenameReport:
 def rename_series(cli: LibraryCli, library: Path, books: list[LibraryBook], old: str, new: str,
                   rename_titles: bool = False, progress: ProgressFn | None = None,
                   cancel: threading.Event | None = None) -> RenameReport:
-    """Passa todos os livros da série `old` para `new` (um livro por vez).
+    """Moves every book of series `old` to `new` (one book at a time).
 
-    Com `rename_titles`, os títulos iguais ao nome antigo da série também mudam.
-    Se `new` já existir, os livros passam a fazer parte dela.
+    With `rename_titles`, the titles equal to the old series name are changed too.
+    If `new` already exists, the books become part of it.
     """
     new = clean_name(new, "da série")
     members = [book for book in books if book.series == old]

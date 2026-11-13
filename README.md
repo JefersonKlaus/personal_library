@@ -1,17 +1,20 @@
 # Personal Library
 
-App desktop (Python + Flet) para cuidar da sua biblioteca de PDFs no Calibre:
+Desktop app (Python + Flet) to look after your PDF library in Calibre:
 
-1. **Importar**: escolha PDFs; título e autor são lidos e ajustados automaticamente
-   (metadados de dentro do PDF, nome do arquivo, lixo como "Microsoft Word - doc1" ou
-   "admin" é descartado, arquivos idênticos são detectados). Você confere e importa para a
-   sua biblioteca do Calibre.
-2. **Galeria**: a biblioteca do Calibre em grade de capas, com busca e detalhes.
-3. **Exportar**: copia livros da biblioteca para outra pasta, no formato do Calibre.
+1. **Import**: choose PDFs; title and author are read and adjusted automatically (metadata
+   from inside the PDF, the file name, junk such as "Microsoft Word - doc1" or "admin" is
+   discarded, identical files are detected). You check the data and import it into your
+   Calibre library.
+2. **Gallery**: the Calibre library as a grid of covers, with search and details.
+3. **Export**: copies books of the library to another folder, in the Calibre layout.
 
-## Instalar e abrir
+> The app window is in Portuguese. This README names the buttons exactly as they appear on
+> screen (**Importar**, **Analisar**, **Exportar**...), with the explanation in English.
 
-Na pasta do projeto:
+## Install and open
+
+In the project folder:
 
 ```bash
 python -m venv .venv
@@ -20,309 +23,366 @@ pip install -r requirements.txt
 flet run
 ```
 
-`flet run` abre o app na janela desktop (ele executa o `main.py` desta pasta). Outras formas:
+`flet run` opens the app in the desktop window (it runs the `main.py` of this folder). Other
+ways:
 
-| Comando            | O que faz                                                           |
+| Command            | What it does                                                        |
 |--------------------|---------------------------------------------------------------------|
-| `flet run`         | abre o app                                                          |
-| `flet run -r`      | abre e reinicia sozinho quando qualquer arquivo do código muda       |
-| `flet run --web`   | abre no navegador                                                   |
-| `python main.py`   | também abre o app, sem o comando `flet`                             |
+| `flet run`         | opens the app                                                       |
+| `flet run -r`      | opens it and restarts on its own when any code file changes          |
+| `flet run --web`   | opens it in the browser                                             |
+| `python main.py`   | also opens the app, without the `flet` command                      |
 
-O `requirements.txt` instala o Flet com `cli` (o comando `flet`) e `desktop` (a janela); sem
-eles o Flet tentaria instalá-los sozinho na primeira execução. A configuração do projeto
-(nome, versão, dependências e `[tool.flet]`) está no `pyproject.toml`, e o `flet run` cria
-uma pasta `.flet/` local de trabalho, que o git já ignora.
+`requirements.txt` installs Flet with `cli` (the `flet` command) and `desktop` (the window);
+without them Flet would try to install them on the first run. The project configuration
+(name, version, dependencies and `[tool.flet]`) is in `pyproject.toml`, and `flet run`
+creates a local `.flet/` working folder, which git already ignores.
 
-Precisa do [Calibre](https://calibre-ebook.com) instalado (o app usa o `calibredb` dele para
-importar). Preferências, registro e miniaturas da galeria ficam em `~/.personal_library`.
+You need [Calibre](https://calibre-ebook.com) installed (the app uses its `calibredb` to
+import). Settings, log and gallery thumbnails live in `~/.personal_library`.
 
-## Como usar
+## How to use
 
-### 1. Importar
+### 1. Importar (import)
 
-1. **Adicionar PDFs…**, **Adicionar pasta…** ou cole um caminho. A análise começa sozinha.
-2. Se os arquivos seguem um formato, descreva-o em **Como importar** (ou escolha em
-   **Modelos**) e clique em **Aplicar**: parâmetros (`@name`, `@vol`, `@auth`...), os
-   delimitadores entre eles e valores fixos para todos os PDFs (`@auth=ONE`). A linha de
-   exemplo mostra como o primeiro arquivo será lido. Vazio = automático.
-3. Confira título, autor, série e volume na lista (edite o que precisar; desmarque o que não
-   quer). Vários autores: separe com `&`.
-4. Opcional: etiquetas para todos os livros (ex.: `importado`).
-5. **Importar para a biblioteca**: os livros vão para a biblioteca escolhida na aba Galeria,
-   com título, autores, ano, idioma, etiquetas e capa (1ª página). Livros que a biblioteca
-   já tem (mesmo título e autor) são avisados e não são duplicados.
-6. **Desfazer última importação** remove esses livros (eles vão para a lixeira do Calibre).
+1. **Adicionar PDFs…**, **Adicionar pasta…** or paste a path. The analysis starts on its own.
+2. If the files follow a format, describe it in **Como importar** (or pick one in
+   **Modelos**) and click **Aplicar**: parameters (`@name`, `@vol`, `@auth`...), the
+   delimiters between them and fixed values for every PDF (`@auth=ONE`). The example line
+   shows how the first file will be read. Empty = automatic.
+3. Check title, author, series and volume in the list (edit whatever you need; untick what
+   you do not want). Several authors: separate them with `&`.
+4. Optional: tags for every book (e.g. `importado`).
+5. **Importar para a biblioteca**: the books go to the library chosen in the Galeria tab,
+   with title, authors, year, language, tags and cover (1st page). Books the library already
+   has (same title and author) are reported and not duplicated.
+6. **Desfazer última importação** removes those books (they go to the Calibre recycle bin).
 
-> **Se outro programa estiver usando a biblioteca** (por exemplo, o Calibre aberto ou um leitor
-> de e-books), **feche-o antes de importar**: enquanto isso, a ferramenta da biblioteca recusa o
-> acesso, e o app avisa "A biblioteca está sendo usada por outro programa".
+> **If another program is using the library** (for instance Calibre itself, or an e-book
+> reader), **close it before importing**: while it is open, the library tool refuses access
+> and the app reports "A biblioteca está sendo usada por outro programa".
 
-#### Usar Groq AI para preencher os dados (opcional)
+#### Using Groq AI to fill in the data (optional)
 
-Para nomes de arquivo sem padrão (`scan_0042.pdf`, `livro final v2.pdf`), marque
-**Usar Groq AI para preencher os dados** e informe a **chave da API da Groq** (crie uma
-grátis em <https://console.groq.com/keys>). Ao **Analisar**, o app primeiro deduz os dados
-como sempre e depois pergunta à IA, **um livro por vez**, título, autores, série, volume,
-ano, editora e idioma. O resultado aparece na mesma lista de conferência: edite o que
-precisar e clique em **Importar para a biblioteca**, como num import normal.
+For file names with no pattern (`scan_0042.pdf`, `livro final v2.pdf`), tick **Usar Groq AI
+para preencher os dados** and provide the **Groq API key** (create a free one at
+<https://console.groq.com/keys>). On **Analisar**, the app first works out the data as usual
+and then asks the AI, **one book at a time**, for title, authors, series, volume, year,
+publisher and language. The result shows up in the same review list: edit whatever you need
+and click **Importar para a biblioteca**, just like in a normal import.
 
-- **O que é enviado**: nome do arquivo, título/autor de dentro do PDF, número de páginas,
-  o que o app já deduziu e o texto das 3 primeiras páginas (até 2.500 caracteres). O arquivo
-  PDF em si não é enviado. PDFs só de imagem (escaneados) não têm texto: a IA usa só o resto.
-- **Regras**: valores fixos de "Como importar" (`@auth=ONE`) sempre vencem a IA; o que a IA
-  não souber mantém o que o app deduziu. Cada livro mostra "preenchido pela IA (N% de
-  confiança)"; abaixo de 50% ele fica em **atenção** para você conferir. Se a IA não
-  responder a um livro, ele fica com os dados do app e em **atenção**.
-- **Chave**: fica salva nas preferências (`~/.personal_library/settings.json`, em texto
-  simples). Se preferir não salvá-la, deixe o campo vazio e defina a variável de ambiente
-  `GROQ_API_KEY`.
-- **Modelo**: padrão `llama-3.3-70b-versatile`. Se a Groq desativar esse modelo, o app avisa;
-  troque no campo **Modelo** por um da lista em <https://console.groq.com/docs/models>.
-- **Limites do plano grátis**: quando a Groq pede para esperar (erro 429), o app espera o
-  tempo indicado e tenta de novo (até 4 vezes). Chave recusada ou sem conexão interrompem a
-  consulta; os livros já analisados continuam na lista. **Cancelar** para a qualquer momento.
+- **What is sent**: file name, title/author from inside the PDF, page count, what the app
+  already worked out and the text of the first 3 pages (up to 2,500 characters). The PDF file
+  itself is not sent. Image-only PDFs (scanned) have no text: the AI uses the rest alone.
+- **Rules**: fixed values of "Como importar" (`@auth=ONE`) always beat the AI; whatever the
+  AI does not know keeps what the app worked out. Each book shows "preenchido pela IA (N% de
+  confiança)"; below 50% it is left in **atenção** for you to check. If the AI does not
+  answer for a book, it keeps the app data and stays in **atenção**.
+- **Key**: it is saved in the settings (`~/.personal_library/settings.json`, in plain text).
+  If you would rather not save it, leave the field empty and set the `GROQ_API_KEY`
+  environment variable.
+- **Model**: `llama-3.3-70b-versatile` by default. If Groq retires that model, the app says
+  so; change the **Modelo** field to one from the list at
+  <https://console.groq.com/docs/models>.
+- **Free plan limits**: when Groq asks to wait (error 429), the app waits the given time and
+  tries again (up to 4 times). A refused key or no connection stops the queries; the books
+  already analysed stay in the list. **Cancelar** stops it at any moment.
 
-#### Qual biblioteca recebe os livros
+#### Which library receives the books
 
-Se nenhuma biblioteca foi escolhida ainda (ou a escolhida foi apagada/movida), o item 3 mostra
-um aviso com as opções:
+If no library has been chosen yet (or the chosen one was deleted/moved), step 3 shows a
+warning with the options:
 
-- **Usar esta**: bibliotecas que o seu Calibre já conhece aparecem listadas (o app lê a
-  configuração do Calibre: biblioteca atual e usadas recentemente, e a pasta padrão
-  `Calibre Library` na sua pasta de usuário);
-- **Escolher biblioteca existente…**: a pasta que tem o `metadata.db` (escolher a pasta de
-  cima, como `Documentos`, também funciona se houver uma só biblioteca dentro dela);
-- **Criar biblioteca nova…**: escolha onde; se a pasta não estiver vazia, a biblioteca é
-  criada numa subpasta `Calibre Library`. Quem cria é o próprio Calibre (`calibredb`), então
-  o Calibre precisa estar instalado, e nenhum programa pode estar usando uma biblioteca
-  nesse momento. Para abri-la depois no Calibre: botão
-  **Biblioteca > Alternar/criar biblioteca** e escolha a pasta.
+- **Usar esta**: libraries your Calibre already knows are listed (the app reads the Calibre
+  configuration: current library and recently used ones, plus the default `Calibre Library`
+  folder in your user folder);
+- **Escolher biblioteca existente…**: the folder holding `metadata.db` (picking the folder
+  above, such as `Documents`, also works if there is a single library inside it);
+- **Criar biblioteca nova…**: choose where; if the folder is not empty, the library is
+  created in a `Calibre Library` subfolder. Calibre itself (`calibredb`) creates it, so
+  Calibre has to be installed, and no program may be using a library at that moment. To open
+  it later in Calibre: **Library > Switch/create library** and choose the folder.
 
-Com uma biblioteca escolhida, **Trocar biblioteca…** mostra as mesmas opções. A biblioteca
-é a mesma nas três abas (Importar, Galeria e Exportar); a Galeria também tem **Criar nova…**.
+With a library chosen, **Trocar biblioteca…** shows the same options. The library is the same
+in the three tabs (Importar, Galeria and Exportar); the Galeria tab also has **Criar nova…**.
 
-#### Como importar: parâmetros, delimitadores e valores fixos
+#### "Como importar": parameters, delimiters and fixed values
 
-Escreva os parâmetros na ordem em que aparecem no nome do arquivo, com os delimitadores
-usados entre eles (`-`, `_`, espaço, parênteses...):
+Write the parameters in the order they appear in the file name, with the delimiters used
+between them (`-`, `_`, space, parentheses...):
 
-| Parâmetro    | Significa                                     | Também aceito                |
+| Parameter    | Means                                         | Also accepted                |
 |--------------|-----------------------------------------------|------------------------------|
-| `@name`      | título da obra                                | `@nome`, `@title`, `@titulo` |
+| `@name`      | title of the work                             | `@nome`, `@title`, `@titulo` |
 | `@vol`       | volume: `Vol 18`, `Volume 41`, `v03`, `03`    | `@volume`                    |
-| `@auth`      | autor(es)                                     | `@autor`, `@author`          |
-| `@year`      | ano: `1999` ou `(1999)`                       | `@ano`                       |
-| `@series`    | série, quando diferente do `@name`            | `@serie`                     |
-| `@publisher` | editora                                       | `@editora`                   |
-| `@lang`      | idioma (`pt`, `por`, `en`...)                 | `@idioma`                    |
-| `@tags`      | etiquetas, separadas por vírgula              | `@etiquetas`                 |
-| `@skip`      | parte a ignorar                               | `@ignorar`                   |
+| `@auth`      | author(s)                                     | `@autor`, `@author`          |
+| `@year`      | year: `1999` or `(1999)`                      | `@ano`                       |
+| `@series`    | series, when different from `@name`           | `@serie`                     |
+| `@publisher` | publisher                                     | `@editora`                   |
+| `@lang`      | language (`pt`, `por`, `en`...)               | `@idioma`                    |
+| `@tags`      | tags, separated by commas                     | `@etiquetas`                 |
+| `@skip`      | part to ignore                                | `@ignorar`                   |
 
-**Valor fixo** (vale para todos os PDFs e vence o nome do arquivo e os metadados do PDF):
-`@parâmetro=valor`, no fim do padrão ou separado por `;`.
+**Fixed value** (holds for every PDF and beats the file name and the PDF metadata):
+`@parameter=value`, at the end of the pattern or separated by `;`.
 
-| Como importar                                        | `One Punch Man - Vol 18` vira                                   |
+| Como importar                                        | `One Punch Man - Vol 18` becomes                                |
 |------------------------------------------------------|-----------------------------------------------------------------|
-| `@name - @vol - @auth`                               | título `One Punch Man`, vol. 18, série `One Punch Man`           |
-| `@name - @vol; @auth=ONE`                            | idem, autor **ONE** em todos                                     |
-| `@name - @vol - @auth=ONE`                           | idem; se o arquivo tiver uma 3ª parte, ela é trocada por ONE     |
-| `@name - @vol; @series=Coleção OPM`                  | título `One Punch Man`, vol. 18, série `Coleção OPM`             |
-| `@name - @vol; @auth=ONE; @tags=mangá; @publisher=Panini; @lang=pt` | idem, com etiqueta, editora e idioma            |
-| `@auth=ONE` (sem padrão)                             | modo automático, só o autor fixo                                 |
-| `@vol; @name=One Punch Man` (arquivos `01.pdf`, `02.pdf`...) | título fixo e volume do nome do arquivo                 |
+| `@name - @vol - @auth`                               | title `One Punch Man`, vol. 18, series `One Punch Man`           |
+| `@name - @vol; @auth=ONE`                            | the same, author **ONE** for all                                 |
+| `@name - @vol - @auth=ONE`                           | the same; if the file has a 3rd part, it is replaced by ONE      |
+| `@name - @vol; @series=Coleção OPM`                  | title `One Punch Man`, vol. 18, series `Coleção OPM`             |
+| `@name - @vol; @auth=ONE; @tags=mangá; @publisher=Panini; @lang=pt` | the same, with tag, publisher and language        |
+| `@auth=ONE` (no pattern)                             | automatic mode, only the author fixed                            |
+| `@vol; @name=One Punch Man` (files `01.pdf`, `02.pdf`...) | fixed title and volume from the file name                   |
 
-Outros exemplos: `@auth - @name (@year)` lê `Machado de Assis - Dom Casmurro (1899)`;
-`@series - @vol - @name` lê `Harry Potter - 1 - A Pedra Filosofal`;
-`@skip - @name - @auth` ignora o `[Grupo]` de `[Grupo] - Iracema - José de Alencar`.
-Partes que faltam no fim do nome ficam vazias. Arquivos fora do padrão ficam com **atenção**
-e são lidos no modo automático (os valores fixos continuam valendo). Quando há padrão, o
-nome do arquivo vale mais que os metadados de dentro do PDF, que só completam o que faltar.
-O formato antigo (`NOME - VOL - AUTOR`) continua aceito.
+Other examples: `@auth - @name (@year)` reads `Machado de Assis - Dom Casmurro (1899)`;
+`@series - @vol - @name` reads `Harry Potter - 1 - A Pedra Filosofal`;
+`@skip - @name - @auth` ignores the `[Grupo]` of `[Grupo] - Iracema - José de Alencar`.
+Parts missing at the end of the name are left empty. Files outside the pattern are left in
+**atenção** and are read in automatic mode (the fixed values still hold). When there is a
+pattern, the file name counts for more than the metadata inside the PDF, which only fills in
+what is missing. The old format (`NOME - VOL - AUTOR`) is still accepted.
 
-**Cada parâmetro preenche só o seu campo**: `@name` é o título (exatamente), `@vol` é o
-volume, `@auth` o autor, `@series` a série. Se o padrão põe algo como `Vol 01` no autor ou no
-título (ex.: `@name - @auth` em `One Punch Man - Vol 01`), o livro fica com **atenção** e a
-linha de exemplo avisa "parece um volume: use @vol".
+**Each parameter fills in its own field only**: `@name` is the title (exactly), `@vol` is the
+volume, `@auth` the author, `@series` the series. If the pattern puts something like `Vol 01`
+in the author or in the title (e.g. `@name - @auth` on `One Punch Man - Vol 01`), the book is
+left in **atenção** and the example line warns "parece um volume: use @vol".
 
-**Volumes e série**: o Calibre só guarda o número do volume dentro de uma série (sem série
-ele descarta o número). Por isso, quando há `@vol` e não há `@series`, a série é o próprio
-`@name`, e a linha de exemplo mostra isso ("Série: One Punch Man (de @name)"). Para outra
-série, use `@series` no padrão ou `@series=...`.
+**Volumes and series**: Calibre only keeps the volume number inside a series (with no series
+it drops the number). That is why, when there is `@vol` and no `@series`, the series is the
+`@name` itself, and the example line shows it ("Série: One Punch Man (de @name)"). For
+another series, use `@series` in the pattern or `@series=...`.
 
-**Duplicados**: o Calibre considera duplicados livros com o mesmo título e autor, e
-recusaria o volume 2 de "One Punch Man". Para volumes, o app compara título + autor + série +
-volume com a biblioteca antes de importar (o mesmo volume de novo aparece como "já existe") e
-manda o resto para o Calibre aceitar. Na Galeria cada capa mostra o volume, e ordenar por
-**Título** ou **Série e volume** põe os volumes em ordem. Ao exportar, volumes com o mesmo
-título e autor ganham o volume no nome do arquivo (`One Punch Man - Vol. 18 - ONE.pdf`).
+**Duplicates**: Calibre treats books with the same title and author as duplicates, and would
+refuse volume 2 of "One Punch Man". For volumes, the app compares title + author + series +
+volume against the library before importing (the same volume again shows up as "já existe")
+and sends the rest for Calibre to accept. In the Galeria tab each cover shows the volume, and
+sorting by **Título** or **Série e volume** puts the volumes in order. On export, volumes
+with the same title and author get the volume in the file name
+(`One Punch Man - Vol. 18 - ONE.pdf`).
 
-O modo automático (campo vazio) também reconhece volumes (`Vol 18`, `Volume 41`, `v03`,
-`- 03`) e segue as mesmas regras.
+Automatic mode (empty field) also recognises volumes (`Vol 18`, `Volume 41`, `v03`, `- 03`)
+and follows the same rules.
 
-### 2. Galeria
+### 2. Galeria (gallery)
 
-Escolha a pasta da biblioteca do Calibre (a que tem `metadata.db`). Os livros aparecem em
-grade de capas como no Calibre: busca por título, autor, etiqueta, série ou editora (sem
-diferenciar acentos) e ordem (mais recentes, título, série e volume, autor, publicação).
+Choose the folder of the Calibre library (the one holding `metadata.db`). The books show up
+as a grid of covers like in Calibre: search by title, author, tag, series or publisher
+(ignoring accents) and order (most recent, title, series and volume, author, publication).
 
-- **Barra lateral de séries**: "Todos os livros", "Sem série" e cada série com a quantidade
-  de livros. Clique numa série (ex.: *Spider-Geddon*) para ver só ela, com os volumes em
-  ordem; a busca e a ordem continuam valendo dentro da série.
-- **Renomear série**: o lápis pequeno ao lado da série. Muda a série em todos os livros dela
-  e, se quiser, também os títulos iguais ao nome antigo (volumes importados com `@name`). Se
-  o nome novo já for de outra série, os livros passam para ela (a janela avisa).
-- **Selecionar e abrir** (como num gerenciador de arquivos): **um clique** só seleciona o
-  livro (fica destacado); **dois cliques**, ou **botão direito > Abrir**, abrem a janela de
-  detalhes. Nela, o lápis pequeno ao lado do título renomeia o livro (✓ salva, ✕ cancela) e
-  **Abrir livro** abre o PDF.
+- **Series sidebar**: "Todos os livros", "Sem série" and each series with its book count.
+  Click a series (e.g. *Spider-Geddon*) to see only it, with the volumes in order; the search
+  and the order still hold inside the series.
+- **Renaming a series**: the small pencil next to the series. It changes the series in every
+  book of it and, if you want, the titles equal to the old name too (volumes imported with
+  `@name`). If the new name already belongs to another series, the books move into it (the
+  dialog says so).
+- **Selecting and opening** (like in a file manager):
+  - **one click** selects only that book (it gets highlighted);
+  - **Ctrl+click** (**Cmd+click** on macOS) adds the book to the selection and keeps the
+    others; Ctrl+click on a selected book takes it out;
+  - **Shift+click** selects every book from the last clicked one to this one, in the order
+    shown (the search, series and sort apply, and the range can span pages);
+    **Ctrl+Shift+click** adds that range to the books already selected;
+  - the count at the bottom says how many are selected, including those on other pages;
+  - **two clicks**, or **right button > Abrir**, open the details window. There, the small
+    pencil next to the title renames the book (✓ saves, ✕ cancels) and **Abrir livro**
+    opens the book for reading.
+- **Reading** (**Abrir livro**): a PDF opens in a **reader window of its own**, one page
+  at a time. It is a normal window: maximize, minimize, resize or close it, and keep using
+  the app meanwhile; several books can be open at once, each in its window. Turn pages
+  with the buttons below the page, by typing the page number, or with the keyboard:
+  → ↓ Page Down and space go forward, ← ↑ Page Up go back, Home/End go to the first/last
+  page, Esc closes the window. The button at the top right opens the file in the default
+  program of the system. Other formats (EPUB...) and PDFs the app cannot read (protected
+  by a password, damaged) open in the default program instead.
+  - In the web version (`flet run --web`) the book opens inside the app window instead,
+    in place of the tabs (**←** or Esc goes back to the gallery).
+  - Each reader window is a small separate process (Flet has one window per app). If one
+    fails to open, the status bar says so and the error is in
+    `~/.personal_library/reader-errors.log`.
+- **Editing metadata** (**right button > Editar metadados**):
+  - **one book**: every field, filled in, next to the cover: title, authors (separate them
+    with `&`), series and volume, publisher, year, tags, languages (`pt`, `en`...),
+    identifiers (`isbn:978...`) and description. Only the fields you change are written;
+    the sort names of the title and authors follow them automatically;
+  - **several books** (right button on one of the selected books): each field has a
+    checkbox, and only the ticked fields are written, with the same value in every
+    selected book (typing in a field ticks it). "(vários valores)" marks the fields where
+    the books differ. Tags and languages replace the ones each book had. Volume and
+    identifiers are edited one book at a time;
+  - only the books on screen are edited (a selected book hidden by the search or the
+    series filter is left alone). Invalid values (a year like `ontem`, a language like
+    `português`) are pointed out in the dialog, and nothing is written until they are fixed.
 
-Para ver, a galeria só lê a biblioteca (banco aberto em modo somente leitura) e funciona com
-o Calibre aberto. Renomear passa pela ferramenta da biblioteca (`calibredb`), como a
-importação: se outro programa estiver usando a biblioteca, feche-o antes. A galeria se
-atualiza sozinha depois de importar ou renomear.
+To display them, the gallery only reads the library (database opened read-only) and works
+with Calibre open. Renaming goes through the library tool (`calibredb`), like importing: if
+another program is using the library, close it first. The gallery refreshes on its own after
+importing or renaming.
 
-### 3. Exportar
+### 3. Exportar (export)
 
-Marque os livros da biblioteca (todos vêm marcados; o filtro e "Marcar/Desmarcar todos"
-ajudam a escolher), escolha a pasta de destino e clique em **Exportar**. Cada livro vira:
+Tick the books of the library (they all start ticked; the filter and "Marcar/Desmarcar todos"
+help you choose), choose the destination folder and click **Exportar**. Each book becomes:
 
 ```
-Autor/Título/Título - Autor.pdf     (e os outros formatos que o livro tiver)
-Autor/Título/Título - Autor.opf     todos os metadados: série, editora, ISBN, descrição...
+Autor/Título/Título - Autor.pdf     (and the other formats the book has)
+Autor/Título/Título - Autor.opf     all the metadata: series, publisher, ISBN, description...
 Autor/Título/cover.jpg
 ```
 
-**Simular** mostra o que seria feito sem tocar no disco; **Desfazer última** apaga a
-exportação. A pasta exportada entra em qualquer Calibre com *Adicionar livros → Adicionar
-de pastas e subpastas*, arrastando os PDFs ou pela pasta de adição automática (nesse caso
-desmarque "Uma pasta por livro", porque o Calibre não olha subpastas).
+**Simular** shows what would be done without touching the disk; **Desfazer última** deletes
+the export. The exported folder goes into any Calibre with *Add books → Add from folders and
+sub-folders*, by dragging the PDFs or through the auto-add folder (in that case untick "One
+folder per book", because Calibre does not look into subfolders).
 
-> O destino não pode ser uma biblioteca do Calibre: ele só mostra livros registrados no
-> `metadata.db`, e arquivos copiados direto para lá ficariam invisíveis. Para colocar livros
-> numa biblioteca, use a aba Importar.
+> The destination cannot be a Calibre library: Calibre only shows books registered in
+> `metadata.db`, and files copied straight there would stay invisible. To put books into a
+> library, use the Importar tab.
 
-A barra de baixo mostra o progresso, o botão **Cancelar** e a última mensagem; **Registro**
-abre o histórico (ele abre sozinho quando há erro).
+The bottom bar shows the progress, the **Cancelar** button and the latest message;
+**Registro** opens the history (it opens on its own when there is an error).
 
-## Como a biblioteca lê os metadados
+## How the library reads the metadata
 
-Regras conferidas no código do Calibre (`calibre/ebooks/metadata/meta.py` e `opf2.py`); os
-nomes exigidos por ele ficam todos em `src/library/manager.py`:
+Rules checked in the Calibre code (`calibre/ebooks/metadata/meta.py` and `opf2.py`); the
+names it requires are all in `src/library/manager.py`:
 
-- Só é usado um `.opf` que tenha o identificador `opf:scheme="calibre"`. Sem ele, o arquivo
-  é ignorado e valem os dados de dentro do PDF ("Microsoft Word - doc1", "admin"...).
-- Para um PDF adicionado sozinho, só é lido o `.opf` **com o mesmo nome** do PDF.
-  Por isso o app grava `Título - Autor.opf`.
-- O ano vai como `AAAA-01-01T12:00:00+00:00`: com meia-noite UTC apareceria dezembro do ano
-  anterior em fusos como o do Brasil.
-- O `opf:file-as` de todos os autores leva a ordenação do livro inteiro
-  (`Lima, Ana & Dias, Rui`), que é como a biblioteca grava e lê.
-- A ferramenta de linha de comando (`calibredb`) é chamada com a saída em inglês, para o app
-  entender a resposta mesmo com o programa em português.
-- Importar passa por uma pasta temporária (PDF + `.opf` + capa) e a ferramenta; a pasta
-  temporária é apagada no fim, mesmo se der erro.
+- Only an `.opf` carrying the `opf:scheme="calibre"` identifier is used. Without it the file
+  is ignored and the data from inside the PDF wins ("Microsoft Word - doc1", "admin"...).
+- For a PDF added on its own, only the `.opf` **with the same name** as the PDF is read.
+  That is why the app writes `Título - Autor.opf`.
+- The year goes as `YYYY-01-01T12:00:00+00:00`: with midnight UTC it would show up as
+  December of the previous year in time zones such as Brazil's.
+- The `opf:file-as` of every author carries the sort name of the whole book
+  (`Lima, Ana & Dias, Rui`), which is how the library writes and reads it.
+- The command line tool (`calibredb`) is called with the output in English, so the app
+  understands the answer even when the program is in Portuguese.
+- Importing goes through a temporary folder (PDF + `.opf` + cover) and the tool; the
+  temporary folder is deleted at the end, even on error.
 
-## Segurança dos arquivos
+## Safety of the files
 
-- Os PDFs de origem nunca são alterados nem apagados.
-- Cópias são gravadas como `.part`, verificadas (tamanho e SHA-256) e só então renomeadas;
-  o `.opf` e a capa são gravados antes, para o livro nunca aparecer sem eles.
-- A biblioteca só é alterada pela ferramenta do próprio Calibre (`calibredb`); o app apenas
-  lê o banco de dados dela (em modo somente leitura).
-- Desfazer nunca sobrescreve arquivos; importações desfeitas vão para a lixeira do Calibre.
-- Se o disco não tiver espaço para o lote, nada é copiado.
-- Nenhum PDF sai do seu computador e não há telemetria. O app só usa a rede se você marcar
-  **Usar Groq AI**: nesse caso, as pistas em texto de cada livro (veja acima) vão para a Groq.
+- The source PDFs are never changed nor deleted.
+- Copies are written as `.part`, verified (size and SHA-256) and only then renamed; the
+  `.opf` and the cover are written first, so the book never shows up without them.
+- The library is only changed by Calibre's own tool (`calibredb`); the app merely reads its
+  database (in read-only mode).
+- Undo never overwrites files; undone imports go to the Calibre recycle bin.
+- If the disk has no room for the batch, nothing is copied.
+- No PDF leaves your computer and there is no telemetry. The app only uses the network if you
+  tick **Usar Groq AI**: in that case, the text clues of each book (see above) go to Groq.
 
-## Estrutura
+## Structure
 
-O código fica em `src/`, dividido em pastas por assunto. Cada pasta só usa as que estão
-abaixo dela:
-
-```
-ui/                        a interface
-importing/  exporting/     a lógica das abas Importar e Exportar
-library/                   a biblioteca de e-books
-parsing/  pdf/             nome do arquivo e conteúdo do PDF
-core/                      a base
-```
-
-A lógica não conhece a interface, e só `library/` conhece o programa externo. Única
-exceção à ordem: `core/settings.py` pega o nome do modelo padrão da Groq em
-`importing/groq_client.py`.
+The code lives in `src/`, split into folders by subject. Each folder only uses the ones below
+it:
 
 ```
-pyproject.toml             projeto, dependências e configuração do `flet run`
-main.py                    ponto de entrada (o que o `flet run` executa)
+ui/                        the interface
+importing/  exporting/     the logic of the Importar and Exportar tabs
+library/                   the e-book library
+parsing/  pdf/             file name and PDF content
+core/                      the base
+```
+
+The logic does not know about the interface, and only `library/` knows about the external
+program. The one exception to the order: `core/settings.py` takes the name of the default
+Groq model from `importing/groq_client.py`.
+
+```
+pyproject.toml             project, dependencies and `flet run` configuration
+main.py                    entry point (what `flet run` executes)
 src/
-  __init__.py              nome e versão do app
+  __init__.py              name and version of the app
 
-  core/                    base usada por todo o app
-    paths.py               pastas do app (~/.personal_library)
-    settings.py            preferências (settings.json)
-    logging_setup.py       registro em arquivo
+  core/                    base used by the whole app
+    paths.py               app folders (~/.personal_library)
+    settings.py            settings (settings.json)
+    logging_setup.py       file log
     models.py              BookEntry, ImportOptions, Status
-    files.py               cópia verificada, espaço em disco, desfazer (manifesto)
-    text.py                limpeza de texto, nomes seguros de arquivo, busca sem acentos
+    files.py               verified copy, disk space, undo (manifest), open with the system
+    text.py                text cleanup, safe file names, accent-insensitive search
 
-  parsing/                 dados do livro a partir do nome do arquivo
-    people.py              nomes de pessoas: reconhecer, separar, ordenar
-    volumes.py             volumes no nome ("Vol 18", "v03")
-    filename_parser.py     modo automático: título/autor/volume do nome do arquivo
-    import_spec.py         "Como importar": @name - @vol; @auth=ONE
+  parsing/                 book data from the file name
+    people.py              person names: recognise, split, sort
+    volumes.py             volumes in the name ("Vol 18", "v03")
+    filename_parser.py     automatic mode: title/author/volume from the file name
+    import_spec.py         "Como importar": @name - @vol; @auth=ONE (and its example line)
 
-  pdf/                     leitura de PDFs
-    pdf_reader.py          metadados de dentro do PDF (e o que é lixo)
-    pdf_cover.py           capa = 1ª página
+  pdf/                     reading PDFs
+    pdf_reader.py          metadata from inside the PDF (and what is junk)
+    pdf_cover.py           cover = 1st page
+    pdf_pages.py           pages as images, one at a time (for the reader)
 
-  importing/               aba Importar (a lógica)
-    analysis.py            achar PDFs, montar cada livro, duplicados
-    groq_client.py         cliente da API da Groq (esperas, novas tentativas, erros)
-    ai_metadata.py         "Usar Groq AI": pistas de cada PDF -> dados do livro
-    importer.py            PDFs revisados -> biblioteca (e desfazer)
+  importing/               Importar tab (the logic)
+    analysis.py            find PDFs, build each book, duplicates
+    groq_client.py         client of the Groq API (waits, retries, errors)
+    ai_metadata.py         "Usar Groq AI": clues of each PDF -> book data
+    importer.py            reviewed PDFs -> library (and undo)
 
-  exporting/               aba Exportar (a lógica)
-    exporter.py            biblioteca -> pasta com .opf e capa
+  exporting/               Exportar tab (the logic)
+    exporter.py            library -> folder with .opf and cover
 
-  library/                 a biblioteca de e-books
-    manager.py             ÚNICO lugar com os nomes do programa externo
-    database.py            leitura somente leitura do banco da biblioteca
-    search.py              busca e ordem
-    thumbnails.py          miniaturas das capas
-    opf.py                 formato .opf
-    location.py            validar, achar e onde criar bibliotecas
-    cli.py                 ferramenta de linha de comando: adicionar, remover, criar
-    renamer.py             renomear livros e séries (pela ferramenta da biblioteca)
+  library/                 the e-book library
+    manager.py             THE ONLY place with the names of the external program
+    database.py            read-only access to the library database
+    search.py              search and order
+    thumbnails.py          cover thumbnails
+    opf.py                 .opf format
+    location.py            validate, find and where to create libraries
+    cli.py                 command line tool: add, remove, create
+    renamer.py             rename books and series (through the library tool)
+    metadata_editor.py     edit the metadata of one book or many (through the library tool)
 
-  ui/                      interface Flet
-    app.py                 janela, barra de status, tarefas e a biblioteca aberta
-    widgets.py             peças reutilizadas (seções, paginação, cores)
-    library_picker.py      escolher/criar/trocar a biblioteca
-    import_tab.py          aba Importar
-    gallery_tab.py         aba Galeria
-    series_sidebar.py      barra lateral de séries (filtrar e renomear)
-    book_views.py          capa, cartão (seleção, abrir) e detalhes de um livro
-    export_tab.py          aba Exportar
-tests/                     pytest: um arquivo por módulo (test_ui_*: ligação da interface)
+  ui/                      Flet interface
+    app.py                 window, status bar, jobs and the open library
+    widgets.py             reused pieces (sections, paging, colours)
+    library_picker.py      choose/create/switch the library
+    import_tab.py          Importar tab
+    export_tab.py          Exportar tab
+    gallery_tab.py         Galeria tab: grid, filters, pages; wires each card to the modules below
+    selection.py           selection rules: click, Ctrl+click, Shift+click (no Flet)
+    keyboard.py            are Shift/Ctrl held? (the window keyboard listener)
+    book_views.py          cover, card and details window of a book
+    series_sidebar.py      series sidebar (filter and rename)
+    metadata_dialog.py     the "Editar metadados" dialog (one book or several)
+    library_edits.py       runs a change through the library tool and reports it
+    book_opener.py         Abrir livro: reader window, reader in the app, or default program
+    reader.py              reading a PDF, one page at a time (the reader itself)
+    reader_launcher.py     starts a reader window (a separate process)
+    reader_window.py       the reader window program (what runs in that process)
+tests/                     pytest, in folders that mirror src/ (tests/ui/test_gallery_tab.py
+                           tests src/ui/gallery_tab.py); helpers.py: shared test helpers,
+                           conftest.py: fixtures
 ```
 
-## Testes
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Os testes de interface usam um Flet de mentira: validam a lógica de ligação, **não** a
-aparência nem a compatibilidade com a versão instalada do Flet. Abra o app e teste à mão.
+The tests are in folders that mirror `src/`: the tests of `src/library/search.py` are in
+`tests/library/test_search.py`. `tests/helpers.py` has what several tests share (test PDFs, a
+sample library, a fake Flet, a fake library tool, the gestures of the gallery) and
+`tests/conftest.py` the fixtures. Run one folder with `python -m pytest tests/ui`.
 
-## Limites conhecidos
+Most interface tests use a fake Flet: they check the wiring logic, **not** the looks.
+`tests/ui/test_real_flet.py` builds the screens and dialogs with the installed Flet, which
+catches control arguments that do not exist in it; it still draws nothing, so open the app
+and test it by hand too.
 
-- A leitura de autor pelo nome do arquivo é uma heurística: confira a lista antes de importar.
-- A IA também erra (e pode "inventar"): confira a lista, principalmente os livros em atenção.
-- Listas de autores separadas só por vírgula (`Silva, Souza, Lima`) não são divididas; use `&`.
-- A ferramenta da biblioteca recusa o acesso enquanto outro programa a usa (feche-o para
-  importar).
-- A galeria mostra 60 livros por página e só renomeia livros e séries (o resto da edição
-  fica com o Calibre).
+## Known limits
+
+- Reading the author from the file name is a heuristic: check the list before importing.
+- The AI gets things wrong too (and may "make things up"): check the list, above all the
+  books left in atenção.
+- Author lists separated by commas alone (`Silva, Souza, Lima`) are not split; use `&`.
+- The library tool refuses access while another program is using it (close it to import).
+- Reader windows need Python, so they work when the app runs with `flet run` or
+  `python main.py`; a packaged app reads the book inside its own window instead.
+- The gallery shows 60 books per page and only renames books and series (the rest of the
+  editing is left to Calibre).

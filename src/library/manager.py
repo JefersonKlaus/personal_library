@@ -1,15 +1,15 @@
-"""Nomes exigidos pelo gerenciador de e-books externo (o dono da biblioteca).
+"""Names required by the external e-book manager (the owner of the library).
 
-É o único lugar do código que cita o programa externo: nomes de executável,
-variáveis de ambiente, pastas de configuração e marcas do formato OPF. Esses
-valores são contrato do programa externo e não podem ser trocados.
+This is the only place in the code that names the external program: executable
+names, environment variables, configuration folders and OPF format markers. These
+values are a contract with the external program and cannot be changed.
 """
 
-PRODUCT = "Calibre"  # nome mostrado ao usuário ("Calibre não encontrado: instale-o...")
+PRODUCT = "Calibre"  # name shown to the user ("Calibre não encontrado: instale-o...")
 
-# Ferramenta de linha de comando
+# Command line tool
 CLI_NAME = "calibredb"
-LANGUAGE_ENV = "CALIBRE_OVERRIDE_LANG"  # força a saída em inglês (ver cli.py)
+LANGUAGE_ENV = "CALIBRE_OVERRIDE_LANG"  # forces the output in English (see cli.py)
 INSTALL_DIRS = (
     r"C:\Program Files\Calibre2",
     r"C:\Program Files (x86)\Calibre2",
@@ -18,14 +18,14 @@ INSTALL_DIRS = (
     "/opt/calibre",
 )
 
-# Configuração do programa (para achar as bibliotecas que ele já conhece)
+# Configuration of the program (to find the libraries it already knows)
 CONFIG_DIR_ENV = "CALIBRE_CONFIG_DIRECTORY"
 CONFIG_DIR_NAME = "calibre"
 CURRENT_LIBRARY_FILE, CURRENT_LIBRARY_KEY = "global.py.json", "library_path"
 RECENT_LIBRARIES_FILE, RECENT_LIBRARIES_KEY = "gui.json", "library_usage_stats"
 DEFAULT_LIBRARY_NAME = "Calibre Library"
 
-# Biblioteca e formato OPF
+# Library and OPF format
 DATABASE_FILE = "metadata.db"
-OPF_TRUSTED_SCHEME = "calibre"  # sem este identificador o programa ignora o OPF inteiro
+OPF_TRUSTED_SCHEME = "calibre"  # without this identifier the program ignores the whole OPF
 OPF_META_PREFIX = "calibre:"  # calibre:series, calibre:series_index, calibre:title_sort

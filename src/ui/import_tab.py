@@ -1,4 +1,4 @@
-"""Aba Importar: escolher PDFs, conferir os dados ajustados e importar para a biblioteca."""
+"""Importar tab: choose PDFs, check the adjusted data and import into the library."""
 from __future__ import annotations
 
 import asyncio
@@ -9,17 +9,16 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import flet as ft
 
-from ..importing import ai_metadata, analysis, importer
-from ..importing.groq_client import DEFAULT_MODEL, GroqClient, resolve_api_key
-from ..parsing.import_spec import FIELD_LABELS, PATTERN_HELP, PatternError, apply_spec, compile_spec
-from ..library.manager import PRODUCT
 from ..core.models import BookEntry, ImportOptions, Status
 from ..core.settings import Settings
-from ..parsing.volumes import looks_like_volume
+from ..importing import ai_metadata, analysis, importer
+from ..importing.groq_client import DEFAULT_MODEL, GroqClient, resolve_api_key
+from ..library.manager import PRODUCT
+from ..parsing.import_spec import PATTERN_HELP, PatternError, compile_spec, describe_pattern
 from .widgets import (STATUS_COLORS, format_size, option_grid, page_count, pager_controls,
                       section, update_pager)
 
-if TYPE_CHECKING:  # só para o editor; evita import circular
+if TYPE_CHECKING:  # for the editor only; avoids a circular import
     from .app import PersonalLibraryApp
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ PATTERN_PRESETS = [
 
 
 class ImportTab:
-    """Controles e ações da aba Importar."""
+    """Controls and actions of the Importar tab."""
 
     def __init__(self, app: "PersonalLibraryApp") -> None:
         self.app = app
@@ -47,7 +46,7 @@ class ImportTab:
         self.sources: list[Path] = [Path(p) for p in settings.last_sources if Path(p).exists()]
         self.entries: list[BookEntry] = []
         self.page_index = 0
-        # 1. Escolha os PDFs
+        # 1. Choose the PDFs
         self.source_label = ft.Text(size=12, color=ft.Colors.GREY_700)
         self.source_input = ft.TextField(label="Colar caminho (pasta ou PDF)", dense=True,
                                          expand=True, on_submit=self.on_add_typed)
@@ -58,7 +57,7 @@ class ImportTab:
         self.cb_author_first = ft.Checkbox(
             label="Automático: autor vem primeiro", value=opts.author_first,
             tooltip="Só vale sem padrão: 'Autor - Título' em vez de 'Título - Autor'.")
-        # IA (Groq): preenche os dados livro por livro
+        # AI (Groq): fills in the data book by book
         self.cb_ai = ft.Checkbox(label="Usar Groq AI para preencher os dados",
                                  value=settings.ai_enabled, on_change=self.on_ai_toggle)
         self.ai_key_field = ft.TextField(
@@ -72,7 +71,7 @@ class ImportTab:
             "número de páginas, o que o app deduziu e o texto das primeiras páginas (o PDF "
             "em si não é enviado). A chave fica salva nas preferências deste computador.",
             size=11, color=ft.Colors.GREY_700)
-        # 2. Confira os dados
+        # 2. Check the data
         self.pattern_field = ft.TextField(
             label="Como importar: parâmetros, delimitadores e valores fixos (vazio = automático)",
             hint_text="ex.: @name - @vol - @auth   ou   @name - @vol; @auth=ONE",
@@ -88,7 +87,7 @@ class ImportTab:
             "Adicione PDFs ou uma pasta: título e autor são lidos e ajustados automaticamente. "
             "Confira aqui antes de importar.", size=13, color=ft.Colors.GREY_700)
         self.prev_btn, self.page_label, self.next_btn = pager_controls(self.on_prev, self.on_next)
-        # 3. Importar para a biblioteca
+        # 3. Import into the library
         self.tags_field = ft.TextField(
             label="Etiquetas para os livros importados (separadas por vírgula)",
             value=", ".join(opts.tags), dense=True, expand=True)
@@ -103,7 +102,7 @@ class ImportTab:
         app.register_actions(self.btn_scan, self.btn_apply_pattern, self.btn_import,
                              self.btn_undo_import)
 
-    # ================================================================== montagem
+    # ================================================================== building
 
     def build(self) -> ft.Control:
         pick_row = ft.Row(controls=[
@@ -147,14 +146,14 @@ class ImportTab:
         ], spacing=10, expand=True))
 
     def refresh(self) -> None:
-        """Atualiza tudo o que depende do estado (fontes, padrão, lista, biblioteca)."""
+        """Refreshes everything that depends on the state (sources, pattern, list, library)."""
         self._show_ai_fields()
         self._update_sources_label()
         self.update_pattern_preview()
         self.refresh_list()
         self.refresh_library()
 
-    # ================================================================== estado
+    # ================================================================== state
 
     def collect_options(self) -> ImportOptions:
         tags = [tag.strip() for tag in (self.tags_field.value or "").split(",") if tag.strip()]
@@ -176,7 +175,7 @@ class ImportTab:
         settings.groq_model = (self.ai_model_field.value or "").strip() or DEFAULT_MODEL
         settings.set_options(self.options)
 
-    # ================================================================== IA (Groq)
+    # ================================================================== AI (Groq)
 
     def _show_ai_fields(self) -> None:
         self.ai_row.visible = self.ai_hint.visible = bool(self.cb_ai.value)
@@ -187,9 +186,9 @@ class ImportTab:
         self.app.page.update()
 
     def groq_client(self) -> GroqClient | None:
-        """O cliente da Groq se "Usar Groq AI" está marcado; None se não está.
+        """The Groq client if "Usar Groq AI" is ticked; None if it is not.
 
-        Levanta ValueError (mensagem pronta) se falta a chave."""
+        Raises ValueError (message ready to be shown) if the key is missing."""
         if not self.cb_ai.value:
             return None
         key = resolve_api_key(self.ai_key_field.value or "")
@@ -199,13 +198,12 @@ class ImportTab:
 
     async def _fill_with_ai(self, entries: list[BookEntry], client: GroqClient,
                             options: ImportOptions) -> str:
-        """Consulta a IA livro por livro; devolve o resumo para a mensagem final."""
+        """Queries the AI book by book; returns the summary for the final message."""
         spec = compile_spec(options.filename_pattern)
         fixed = spec.fixed if spec is not None else {}
         report = await self.app.run_job(ai_metadata.fill_with_ai, entries, client, fixed,
                                         options.unknown_author, label="Consultando a IA")
-        for error in report.errors[:20]:
-            self.app.log(f"  ✗ {error}", True)
+        self.app.log_errors(report.errors)
         if report.stopped:
             self.app.log(f"IA interrompida: {report.stopped}", True)
         message = f"IA: {report.done} de {report.total} preenchido(s)"
@@ -214,7 +212,7 @@ class ImportTab:
         return message + (" (cancelado)" if report.cancelled else "")
 
     def refresh_library(self) -> None:
-        """A ferramenta da biblioteca foi achada? E o botão Importar pode ser usado?"""
+        """Was the library tool found? And can the Importar button be used?"""
         cli = self.app.cli()
         self.cli_text.value = "" if cli else (f"{PRODUCT} não encontrado: instale-o ou informe o "
                                               "caminho abaixo.")
@@ -235,7 +233,7 @@ class ImportTab:
         self.source_label.value = f"{len(self.sources)} origem(ns): {names}{extra}"
 
     def _add_sources(self, paths: list[Path]) -> bool:
-        """Adiciona origens; True se vale analisar (algo novo ou nada analisado ainda)."""
+        """Adds sources; True if analysing is worthwhile (something new or nothing analysed yet)."""
         added = False
         for path in paths:
             if path not in self.sources:
@@ -246,7 +244,7 @@ class ImportTab:
         self.app.page.update()
         return bool(paths) and (added or not self.entries)
 
-    # ================================================================== lista de revisão
+    # ================================================================== review list
 
     def _row(self, entry: BookEntry) -> ft.Control:
         done = entry.status is Status.DONE
@@ -279,7 +277,7 @@ class ImportTab:
     def toggle(self, entry: BookEntry, value: bool) -> None:
         entry.selected = value
         if value and entry.status in (Status.DUPLICATE, Status.EXISTS):
-            entry.status = Status.READY  # o usuário quer este mesmo assim
+            entry.status = Status.READY  # the user wants this one anyway
         self.refresh_import_button()
         self.app.page.update()
 
@@ -290,7 +288,7 @@ class ImportTab:
             try:
                 entry.series_index = float(text.replace(",", ".")) if text else None
             except ValueError:
-                pass  # o usuário ainda está digitando; mantém o último número válido
+                pass  # the user is still typing; keeps the last valid number
             return
         setattr(entry, field, text)
         if field in ("title", "author"):
@@ -322,13 +320,13 @@ class ImportTab:
     # ================================================================== "Como importar"
 
     def _preview_name(self) -> str | None:
-        """Nome de um arquivo real para mostrar como o padrão será lido."""
+        """Name of a real file, to show how the pattern will be read."""
         if self.entries:
             return self.entries[0].source.stem
         return next((source.stem for source in self.sources if source.is_file()), None)
 
     def update_pattern_preview(self) -> bool:
-        """Mostra o resultado de "Como importar" no 1º arquivo; False se inválido."""
+        """Shows the result of "Como importar" on the 1st file; False if invalid."""
         preview = self.pattern_preview
         try:
             spec = compile_spec((self.pattern_field.value or "").strip())
@@ -342,31 +340,9 @@ class ImportTab:
                              "Configuração válida. Adicione PDFs para ver o exemplo.")
             preview.color = ft.Colors.GREY_700
             return True
-        parsed, matched = apply_spec(name, spec, bool(self.cb_author_first.value))
-        fixed = spec.fixed if spec is not None else {}
-
-        def mark(field: str, value: str = "") -> str:
-            if looks_like_volume(value):
-                return " (parece um volume: use @vol)"
-            return " (fixo)" if field in fixed else ""
-
-        parts = [f"Título: {parsed.title}{mark('title', parsed.title)}",
-                 f"Autor: {parsed.author or '—'}{mark('author', parsed.author)}"]
-        if parsed.series_index is not None:
-            parts.append(f"Vol.: {parsed.series_index:g}{mark('volume')}")
-        if parsed.series:
-            origin = " (de @name: a biblioteca só guarda o volume dentro de uma série)" \
-                if parsed.series_from_name else mark("series")
-            parts.append(f"Série: {parsed.series}{origin}")
-        for field, value in (("year", parsed.year), ("publisher", parsed.publisher),
-                             ("language", parsed.language), ("tags", ", ".join(parsed.tags))):
-            if value:
-                parts.append(f"{FIELD_LABELS[field]}: {value}{mark(field)}")
-        prefix = f"«{name}» → " if matched else f"«{name}» não segue o padrão; no automático → "
-        preview.value = prefix + " · ".join(parts)
-        suspicious = looks_like_volume(parsed.author) or looks_like_volume(parsed.title)
-        preview.color = ft.Colors.INDIGO_700 if matched and not suspicious \
-            else ft.Colors.ORANGE_800
+        described = describe_pattern(name, spec, bool(self.cb_author_first.value))
+        preview.value = described.text
+        preview.color = ft.Colors.INDIGO_700 if described.ok else ft.Colors.ORANGE_800
         return True
 
     def on_pattern_change(self, _event: Any) -> None:
@@ -374,7 +350,7 @@ class ImportTab:
         self.app.page.update()
 
     async def on_apply_pattern(self, _event: Any) -> None:
-        """Relê os arquivos com o padrão (as edições manuais da lista são refeitas)."""
+        """Re-reads the files with the pattern (manual edits in the list are redone)."""
         if not self.update_pattern_preview():
             self.app.log(self.pattern_preview.value, True)
             return
@@ -387,7 +363,7 @@ class ImportTab:
 
     async def apply_preset(self, value: str) -> None:
         self.pattern_field.value = value
-        if value.endswith("="):  # modelo para completar (ex.: "@auth="): não aplica ainda
+        if value.endswith("="):  # template to be completed (e.g. "@auth="): does not apply yet
             self.pattern_preview.value = "Complete o valor fixo depois do = e clique em Aplicar."
             self.pattern_preview.color = ft.Colors.GREY_700
             self.app.page.update()
@@ -395,11 +371,11 @@ class ImportTab:
         await self.on_apply_pattern(None)
 
     def _preset_handler(self, value: str) -> Callable[[Any], Any]:
-        async def handler(_event: Any) -> None:  # async def: o Flet só espera funções async
+        async def handler(_event: Any) -> None:  # async def: Flet only awaits async functions
             await self.apply_preset(value)
         return handler
 
-    # ================================================================== origens
+    # ================================================================== sources
 
     async def on_pick_files(self, _event: Any) -> None:
         try:
@@ -443,10 +419,10 @@ class ImportTab:
         self.refresh_library()
         self.app.page.update()
 
-    # ================================================================== ações
+    # ================================================================== actions
 
     async def on_scan(self, _event: Any) -> None:
-        """Lê os PDFs e ajusta título/autor (ainda não grava nada)."""
+        """Reads the PDFs and adjusts title/author (nothing is written yet)."""
         if not self.sources:
             self.app.log("Escolha ao menos uma pasta ou PDF.", True)
             return
@@ -460,7 +436,7 @@ class ImportTab:
         except ValueError as exc:
             self.app.log(str(exc), True)
             return
-        exclude = self.app.library  # nunca relê a própria biblioteca
+        exclude = self.app.library  # never re-reads the library itself
         try:
             files = await asyncio.to_thread(analysis.find_pdfs, self.sources, options.recursive,
                                             exclude)
@@ -471,11 +447,11 @@ class ImportTab:
             entries = await self.app.run_job(analysis.build_entries, files, options,
                                              label="Analisando")
         except Exception as exc:
-            logger.exception("Falha na análise")
+            logger.exception("Analysis failed")
             self.app.log(f"Erro na análise: {exc}", True)
             return
-        # Cópias idênticas antes da IA (não manda o mesmo PDF duas vezes); "mesmo livro em
-        # arquivos diferentes" depois, porque depende dos títulos que a IA devolver.
+        # Identical copies before the AI (does not send the same PDF twice); "same book in
+        # different files" afterwards, because it depends on the titles the AI returns.
         duplicates = analysis.mark_identical_files(entries, options)
         self.entries, self.page_index = entries, 0
         ai_summary = await self._fill_with_ai(entries, client, options) if client else ""
@@ -487,7 +463,7 @@ class ImportTab:
         self.refresh_list()
 
     async def on_import(self, _event: Any) -> None:
-        """Adiciona os livros marcados à biblioteca aberta."""
+        """Adds the ticked books to the open library."""
         library, cli = self.app.library, self.app.cli()
         if not any(entry.usable for entry in self.entries):
             self.app.log("Nenhum livro marcado para importar.", True)
@@ -504,14 +480,13 @@ class ImportTab:
             report = await self.app.run_job(importer.import_books, self.entries, library,
                                             options, cli, label="Importando")
         except Exception as exc:
-            logger.exception("Falha na importação")
+            logger.exception("Import failed")
             self.app.log(f"Erro na importação: {exc}", True)
             return
-        for error in report.errors[:20]:
-            self.app.log(f"  ✗ {error}", True)
+        self.app.log_errors(report.errors)
         self.refresh_list()
         if report.added:
-            await self.app.open_library(library)  # a galeria já mostra os livros novos
+            await self.app.open_library(library)  # the gallery already shows the new books
         self.app.log(report.summary() + (" Veja na aba Galeria." if report.added else ""),
                      error=bool(report.failed))
 

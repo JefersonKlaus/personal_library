@@ -1,24 +1,24 @@
 [project]
 name = "personal-library"
 version = "3.0.0"
-description = "Importa PDFs para a sua biblioteca de e-books, mostra a galeria e exporta."
+description = "Imports PDFs into your e-book library, shows the gallery and exports."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Jeferson Klaus" }]
 dependencies = [
-    # cli = comando `flet run`; desktop = a janela do app. Sem eles o Flet tenta
-    # instalá-los sozinho na primeira execução (lento e falha sem internet).
+    # cli = the `flet run` command; desktop = the app window. Without them Flet tries
+    # to install them on the first run (slow, and it fails with no internet).
     "flet[cli,desktop]>=1.0.5",
     "pypdf>=4.0",
-    "pypdfium2",  # capa da 1ª página ao importar
-    "Pillow",     # miniaturas da galeria
+    "pypdfium2",  # cover from the 1st page when importing
+    "Pillow",     # gallery thumbnails
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "reportlab>=4.0"]
 
-# `flet run` (sem argumentos) executa o main.py desta pasta (o código fica em src/).
+# `flet run` (with no arguments) runs the main.py of this folder (the code lives in src/).
 [tool.flet]
 product = "Personal Library"
 org = "io.personallibrary"
@@ -27,3 +27,5 @@ copyright = "Copyright (c) 2026 Jeferson Klaus"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# "." for `import src...`, "tests" for `import helpers` from the test folders.
+pythonpath = [".", "tests"]

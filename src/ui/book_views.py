@@ -1,35 +1,22 @@
-"""Como um livro da biblioteca aparece: capa, cartão da grade e janela de detalhes."""
+"""How a book of the library looks: cover, grid card and details window."""
 from __future__ import annotations
 
 import hashlib
-import os
-import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 import flet as ft
 
-from ..library.database import LibraryBook
 from ..core.text import html_to_text
+from ..library.database import LibraryBook
 
-# Cores das capas geradas para livros sem capa.
+# Colours of the covers generated for books without one.
 PLACEHOLDER_COLORS = ["#37474F", "#4E342E", "#1B5E20", "#0D47A1", "#4A148C", "#B71C1C", "#006064"]
 
-# Dois cliques no mesmo cartão dentro deste intervalo contam como duplo clique
-# (o mesmo padrão do Windows).
+# Two clicks on the same card within this interval count as a double click
+# (the same default as Windows).
 DOUBLE_CLICK_SECONDS = 0.5
-
-
-def open_path(path: Path) -> None:
-    """Abre um arquivo ou pasta com o programa padrão do sistema."""
-    if os.name == "nt":
-        os.startfile(str(path))  # type: ignore[attr-defined]
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(path)])
-    else:
-        subprocess.Popen(["xdg-open", str(path)])
 
 
 def placeholder_color(title: str) -> str:
@@ -38,11 +25,11 @@ def placeholder_color(title: str) -> str:
 
 
 def cover_view(book: LibraryBook, data: bytes | None, big: bool = False) -> ft.Control:
-    """A capa; sem capa, um retângulo colorido com título e autor."""
+    """The cover; without one, a coloured rectangle with title and author."""
     size: dict[str, Any] = {"width": 220, "height": 330} if big else {"expand": True}
     if data:
-        # Imagem de fundo: preenche o quadro todo, então as capas da grade ficam do
-        # mesmo tamanho mesmo com proporções diferentes.
+        # Background image: fills the whole frame, so the covers of the grid are all the
+        # same size even with different aspect ratios.
         return ft.Container(image=ft.DecorationImage(src=data, fit=ft.BoxFit.COVER),
                             border_radius=6, border=ft.Border.all(1, ft.Colors.GREY_300), **size)
     return ft.Container(
@@ -60,7 +47,7 @@ def cover_view(book: LibraryBook, data: bytes | None, big: bool = False) -> ft.C
 
 
 def _volume_badge(book: LibraryBook, cover: ft.Control) -> ft.Control:
-    """Volumes costumam ter o mesmo título: o número aparece sobre a capa."""
+    """Volumes usually share the same title: the number appears over the cover."""
     return ft.Stack(expand=True, fit=ft.StackFit.EXPAND, controls=[
         cover,
         ft.Container(
@@ -75,22 +62,25 @@ Handler = Callable[[Any], Any]
 
 
 class BookCard:
-    """Cartão da grade: capa, título (2 linhas) e autor.
+    """Grid card: cover, title (2 lines) and author.
 
-    Como num gerenciador de arquivos: um clique só seleciona; dois cliques, ou botão
-    direito > Abrir, abrem a janela de detalhes.
+    Like in a file manager: one click selects (Shift+click selects a range: that is up to
+    `on_select`); two clicks, or right button > Abrir, open the details window; right
+    button > Editar metadados calls `on_edit`. The right button calls `on_context` first,
+    so it can keep a selection of several books.
 
-    O duplo clique é detectado aqui, não com o on_double_tap do GestureDetector: com
-    on_double_tap presente, o Flutter segura todo clique esquerdo por ~300 ms esperando
-    um possível segundo clique antes de disparar on_tap, e a seleção ficava atrasada
-    (o botão direito, sem essa espera, era instantâneo). Com on_tap_down o clique
-    esquerdo seleciona no momento em que o botão é pressionado, igual ao direito."""
+    The double click is detected here, not with the on_double_tap of the GestureDetector:
+    with on_double_tap present, Flutter holds every left click for ~300 ms waiting for a
+    possible second click before firing on_tap, and the selection was delayed (the right
+    button, without that wait, was instant). With on_tap_down the left click selects the
+    moment the button is pressed, just like the right one."""
 
     def __init__(self, book: LibraryBook, cover: bytes | None, selected: bool,
-                 on_select: Handler, on_open: Handler) -> None:
+                 on_select: Handler, on_open: Handler, on_context: Handler,
+                 on_edit: Handler) -> None:
         self.book = book
         self.on_select, self.on_open = on_select, on_open
-        self._last_tap: float | None = None  # hora do clique anterior (duplo clique)
+        self._last_tap: float | None = None  # time of the previous click (double click)
         cover_control = cover_view(book, cover)
         tooltip = f"{book.title}\n{book.authors_text}"
         if book.series:
@@ -100,7 +90,7 @@ class BookCard:
             border_radius=8, padding=6, tooltip=tooltip,
             content=ft.Column(controls=[
                 cover_control,
-                # Altura fixa de 2 linhas: todas as capas da grade ficam do mesmo tamanho.
+                # Fixed height of 2 lines: every cover of the grid keeps the same size.
                 ft.Container(height=34, content=ft.Text(
                     book.title, size=12, weight=ft.FontWeight.BOLD, max_lines=2,
                     overflow=ft.TextOverflow.ELLIPSIS)),
@@ -111,32 +101,35 @@ class BookCard:
         self.control = ft.ContextMenu(
             content=ft.GestureDetector(content=self.frame, mouse_cursor=ft.MouseCursor.CLICK,
                                        on_tap_down=self.on_tap_down,
-                                       on_secondary_tap_down=on_select),
-            secondary_items=[ft.PopupMenuItem(content="Abrir", icon=ft.Icons.OPEN_IN_NEW,
-                                              on_click=on_open)])
+                                       on_secondary_tap_down=on_context),
+            secondary_items=[
+                ft.PopupMenuItem(content="Abrir", icon=ft.Icons.OPEN_IN_NEW, on_click=on_open),
+                ft.PopupMenuItem(content="Editar metadados", icon=ft.Icons.EDIT_NOTE,
+                                 on_click=on_edit),
+            ])
 
     def on_tap_down(self, event: Any) -> None:
-        """Clique esquerdo: seleciona na hora; se for o segundo de um duplo clique, abre."""
+        """Left click: selects right away; if it is the second of a double click, opens."""
         now = time.monotonic()
         double = self._last_tap is not None and now - self._last_tap <= DOUBLE_CLICK_SECONDS
-        # Depois de um duplo clique, o próximo clique recomeça a contagem (3 cliques
-        # rápidos não abrem a janela duas vezes).
+        # After a double click, the next click starts counting again (3 quick clicks
+        # do not open the window twice).
         self._last_tap = None if double else now
         if double:
-            self.on_open(event)  # on_open também seleciona
+            self.on_open(event)
         else:
             self.on_select(event)
 
     def set_selected(self, selected: bool) -> None:
         self.selected = selected
-        # A borda existe sempre (transparente): selecionar não mexe no tamanho do cartão.
+        # The border is always there (transparent): selecting does not change the card size.
         self.frame.bgcolor = ft.Colors.INDIGO_100 if selected else None
         self.frame.border = ft.Border.all(
             2, ft.Colors.INDIGO_400 if selected else ft.Colors.TRANSPARENT)
 
 
 def details_rows(book: LibraryBook) -> list[tuple[str, str]]:
-    """Os campos do livro que estão preenchidos, na ordem de exibição."""
+    """The fields of the book that are filled in, in display order."""
     identifiers = ", ".join(f"{k}:{v}" for k, v in sorted(book.identifiers.items()))
     rows = [
         ("Autor(es)", book.authors_text),
@@ -153,18 +146,18 @@ def details_rows(book: LibraryBook) -> list[tuple[str, str]]:
 
 
 class BookDetailsDialog:
-    """Janela de detalhes: capa grande, todos os dados, 'Abrir livro' e o botão pequeno
-    ao lado do título para renomear o livro."""
+    """Details window: big cover, all the data, 'Abrir livro' (reads the PDF in the app)
+    and the small button next to the title to rename the book."""
 
     def __init__(self, book: LibraryBook, cover: bytes | None, library: Path,
-                 on_open: Callable[[Path | None], None], on_close: Callable[[Any], None],
+                 on_open: Callable[[LibraryBook, Path | None], Awaitable[None]],
+                 on_close: Callable[[Any], None],
                  on_rename: Callable[[LibraryBook, str], Awaitable[bool]],
                  update: Callable[[], None]) -> None:
         self.book = book
-        self.on_rename = on_rename
-        self.update = update
-        # expand_loose: o título ocupa só a largura que precisa (o lápis fica colado nele),
-        # mas títulos longos ainda quebram linha em vez de estourar a janela.
+        self.on_open, self.on_rename, self.update = on_open, on_rename, update
+        # expand_loose: the title takes only the width it needs (the pencil stays next to it),
+        # but long titles still wrap instead of overflowing the window.
         self.title_text = ft.Text(book.title, size=20, weight=ft.FontWeight.BOLD, expand=True,
                                   expand_loose=True)
         self.title_field = ft.TextField(value=book.title, dense=True, expand=True,
@@ -175,7 +168,7 @@ class BookDetailsDialog:
                                          on_click=self.start_edit)
         self.title_row = ft.Row(controls=[self.title_text, self.edit_button],
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER)
-        main_file = book.main_file(library)
+        self.main_file = main_file = book.main_file(library)
         self.dialog = ft.AlertDialog(
             title=self.title_row,
             content=ft.Container(width=660, height=340, content=ft.Row(controls=[
@@ -184,9 +177,8 @@ class BookDetailsDialog:
                           spacing=6),
             ], vertical_alignment=ft.CrossAxisAlignment.START, spacing=18)),
             actions=[
-                ft.FilledButton("Abrir livro", icon=ft.Icons.OPEN_IN_NEW,
-                                on_click=lambda _e: on_open(main_file),
-                                disabled=main_file is None),
+                ft.FilledButton("Abrir livro", icon=ft.Icons.MENU_BOOK,
+                                on_click=self.open_book, disabled=main_file is None),
                 ft.TextButton("Fechar", on_click=on_close),
             ])
 
@@ -200,6 +192,10 @@ class BookDetailsDialog:
         if comments:
             info += [ft.Divider(), ft.Text(comments, size=12, selectable=True)]
         return info
+
+    async def open_book(self, _event: Any) -> None:
+        """PDFs open in the app's reader (the gallery decides)."""
+        await self.on_open(self.book, self.main_file)
 
     def start_edit(self, _event: Any) -> None:
         self.title_field.value = self.title_text.value

@@ -1,7 +1,7 @@
-"""Escolha da biblioteca: usar uma conhecida, escolher uma pasta ou criar uma nova.
+"""Choosing the library: use a known one, pick a folder or create a new one.
 
-Mostra a linha "Os livros vão para ..." quando há uma biblioteca válida, ou um
-aviso com as opções quando não há (ou quando o usuário pede para trocar).
+Shows the "Os livros vão para ..." line when there is a valid library, or a warning
+with the options when there is none (or when the user asks to switch).
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from ..library.cli import LibraryCli
 from ..library.location import find_library_in, is_library, known_libraries, new_library_path
 from ..library.manager import DATABASE_FILE, PRODUCT
 
-if TYPE_CHECKING:  # só para o editor; evita import circular
+if TYPE_CHECKING:  # for the editor only; avoids a circular import
     from .app import PersonalLibraryApp
 
 MAX_SUGGESTIONS = 4
@@ -25,11 +25,11 @@ IN_USE_HINT = ("Se outro programa estiver usando esta biblioteca (um gerenciador
 
 
 class LibraryPicker:
-    """Controles e ações para escolher a biblioteca usada pelas três abas."""
+    """Controls and actions to choose the library used by the three tabs."""
 
     def __init__(self, app: "PersonalLibraryApp") -> None:
         self.app = app
-        self._switching = False  # "Trocar biblioteca…" com uma biblioteca válida
+        self._switching = False  # "Trocar biblioteca…" when there is a valid library
         self.current_text = ft.Text(size=12, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS)
         self.current_row = ft.Row(controls=[
             ft.Icon(ft.Icons.COLLECTIONS_BOOKMARK, color=ft.Colors.INDIGO_700, size=18),
@@ -64,10 +64,10 @@ class LibraryPicker:
     def is_open(self) -> bool:
         return self.panel.visible
 
-    # ------------------------------------------------------------------ estado
+    # ------------------------------------------------------------------ state
 
     def refresh(self) -> None:
-        """Mostra a biblioteca atual, ou o aviso com as opções quando falta uma válida."""
+        """Shows the current library, or the warning with the options when a valid one is missing."""
         library = self.app.settings.library
         valid = is_library(library)
         show = not valid or self._switching
@@ -89,7 +89,7 @@ class LibraryPicker:
         return f"Trocar de biblioteca (atual: {library})"
 
     def _style(self, warning: bool) -> None:
-        """Falta de biblioteca é um aviso; trocar é uma ação normal."""
+        """A missing library is a warning; switching is a normal action."""
         self.icon.icon = ft.Icons.WARNING_AMBER if warning else ft.Icons.SWAP_HORIZ
         self.icon.color = ft.Colors.ORANGE_800 if warning else ft.Colors.INDIGO_700
         self.title.color = ft.Colors.ORANGE_900 if warning else ft.Colors.INDIGO_900
@@ -113,10 +113,10 @@ class LibraryPicker:
             ], vertical_alignment=ft.CrossAxisAlignment.CENTER, spacing=6))
         return rows
 
-    # ------------------------------------------------------------------ ações
+    # ------------------------------------------------------------------ actions
 
     def _use_handler(self, path: Path) -> Callable[[Any], Any]:
-        async def handler(_event: Any) -> None:  # async def: o Flet só espera funções async
+        async def handler(_event: Any) -> None:  # async def: Flet only awaits async functions
             await self.use(path)
         return handler
 
@@ -147,7 +147,7 @@ class LibraryPicker:
         await self.use(found)
 
     async def on_create(self, _event: Any) -> None:
-        """Pergunta onde criar, confirma e cria uma biblioteca vazia."""
+        """Asks where to create it, confirms and creates an empty library."""
         cli = self.app.cli()
         if cli is None:
             self.app.log(f"Para criar uma biblioteca é preciso ter o {PRODUCT} instalado.", True)

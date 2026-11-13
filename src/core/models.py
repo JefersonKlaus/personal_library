@@ -1,4 +1,4 @@
-"""Modelo de dados da importação: o livro analisado e as opções da análise."""
+"""Data model of the import: the analysed book and the analysis options."""
 from __future__ import annotations
 
 import enum
@@ -8,7 +8,7 @@ from typing import Any
 
 
 class Status(str, enum.Enum):
-    """Situação de um livro durante a análise e a importação/exportação."""
+    """State of a book during analysis and import/export."""
 
     READY = "pronto"
     WARNING = "atenção"
@@ -19,22 +19,22 @@ class Status(str, enum.Enum):
     FAILED = "falhou"
 
 
-# Só livros nestes estados são importados.
+# Only books in these states are imported.
 USABLE_STATUSES = (Status.READY, Status.WARNING)
 
 
 @dataclass
 class BookEntry:
-    """Um PDF analisado, com os metadados que a biblioteca vai receber."""
+    """An analysed PDF, with the metadata the library will receive."""
 
     source: Path
     title: str = ""
-    author: str = ""  # vários autores: 'A & B'
+    author: str = ""  # several authors: 'A & B'
     year: int | None = None
     series: str = ""
-    series_index: float | None = None  # número do volume na série
+    series_index: float | None = None  # number of the volume in the series
     publisher: str = ""
-    tags: list[str] = field(default_factory=list)  # do nome do arquivo ou @tags=...
+    tags: list[str] = field(default_factory=list)  # from the file name or @tags=...
     language: str | None = None
     pages: int = 0
     size: int = 0
@@ -42,12 +42,12 @@ class BookEntry:
     status: Status = Status.READY
     selected: bool = True
     notes: list[str] = field(default_factory=list)
-    title_origin: str = "arquivo"  # arquivo | pdf | fixo | manual
+    title_origin: str = "arquivo"  # file | pdf | fixed | manual
     author_origin: str = "arquivo"
 
     @property
     def usable(self) -> bool:
-        """True se o livro está marcado e em condições de ser importado."""
+        """True if the book is ticked and fit to be imported."""
         return self.selected and self.status in USABLE_STATUSES
 
     @property
@@ -59,12 +59,12 @@ class BookEntry:
         return bool(self.series) and self.series_index is not None
 
     def note(self, message: str) -> None:
-        """Adiciona uma observação sem repetir as existentes."""
+        """Adds a note without repeating the existing ones."""
         if message not in self.notes:
             self.notes.append(message)
 
     def fail(self, message: str, status: Status = Status.ERROR) -> None:
-        """Tira o livro da importação registrando o motivo."""
+        """Takes the book out of the import, recording the reason."""
         self.status = status
         self.selected = False
         self.note(message)
@@ -72,13 +72,13 @@ class BookEntry:
 
 @dataclass
 class ImportOptions:
-    """Como os PDFs são lidos e importados (aba Importar)."""
+    """How the PDFs are read and imported (Import tab)."""
 
     recursive: bool = True
     skip_duplicates: bool = True
     prefer_pdf_metadata: bool = True
-    author_first: bool = True  # modo automático: "Autor - Título"
-    filename_pattern: str = ""  # "Como importar": "@name - @vol; @auth=ONE"; vazio = automático
+    author_first: bool = True  # automatic mode: "Autor - Título"
+    filename_pattern: str = ""  # "Como importar": "@name - @vol; @auth=ONE"; empty = automatic
     unknown_author: str = "Unknown"
     tags: list[str] = field(default_factory=list)
     workers: int = 4
@@ -88,7 +88,7 @@ class ImportOptions:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ImportOptions":
-        """Cria a partir de um dicionário, ignorando chaves desconhecidas e tipos errados."""
+        """Builds from a dict, ignoring unknown keys and wrong types."""
         defaults = cls()
         clean = {}
         for item in fields(cls):

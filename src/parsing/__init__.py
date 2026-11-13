@@ -1,1 +1,1 @@
-"""Dados do livro a partir do nome do arquivo: título, autores, volumes e o padrão "Como importar"."""
+"""Book data from the file name: title, authors, volumes and the "Como importar" pattern."""

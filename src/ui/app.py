@@ -1,7 +1,7 @@
-"""Janela principal: monta as abas e oferece os serviços que elas compartilham.
+"""Main window: builds the tabs and offers the services they share.
 
-Serviços: registro/barra de status, tarefas em segundo plano com progresso,
-seletor de pastas, preferências e a biblioteca aberta (a mesma nas três abas).
+Services: log/status bar, background jobs with progress, folder picker, settings
+and the open library (the same one in the three tabs).
 """
 from __future__ import annotations
 
@@ -15,12 +15,14 @@ from typing import Any, Callable
 import flet as ft
 
 from .. import APP_NAME
+from ..core.settings import Settings, load_settings, save_settings
 from ..library.cli import LibraryCli
 from ..library.database import LibraryBook, LibraryError, load_library
-from ..core.settings import Settings, load_settings, save_settings
+from .book_opener import BookOpener
 from .export_tab import ExportTab
 from .gallery_tab import GalleryTab
 from .import_tab import ImportTab
+from .keyboard import ModifierKeys
 from .library_picker import LibraryPicker
 from .widgets import TAB_IMPORT
 
@@ -30,7 +32,7 @@ MAX_LOG_LINES = 400
 
 
 class PersonalLibraryApp:
-    """Monta a janela e coordena as abas."""
+    """Builds the window and coordinates the tabs."""
 
     def __init__(self, page: ft.Page) -> None:
         self.page = page
@@ -38,8 +40,10 @@ class PersonalLibraryApp:
         self.file_picker = ft.FilePicker()
         self.cancel_event = threading.Event()
         self.busy = False
+        self.keys = ModifierKeys()  # Shift held? (Shift+click in the gallery)
+        self.opener = BookOpener(self)  # Abrir livro (reader window, or here)
         self._action_buttons: list[ft.Control] = []
-        # A biblioteca aberta (None se a escolhida não existe ou não é válida).
+        # The open library (None if the chosen one does not exist or is not valid).
         self.library: Path | None = None
         self.books: list[LibraryBook] = []
         self._build_status_bar()
@@ -48,7 +52,7 @@ class PersonalLibraryApp:
         self.gallery = GalleryTab(self)
         self.export_tab = ExportTab(self)
 
-    # ================================================================== montagem
+    # ================================================================== building
 
     def _build_status_bar(self) -> None:
         self.progress = ft.ProgressBar(value=0, width=220, visible=False)
@@ -63,13 +67,13 @@ class PersonalLibraryApp:
                                      on_click=self.on_toggle_log)
 
     def build(self) -> None:
-        """Registra o seletor de arquivos e coloca as três abas na janela."""
+        """Registers the file picker and puts the three tabs in the window."""
         registry = getattr(self.page, "services", None)
-        if registry is None:  # versões antigas do Flet usam overlay
+        if registry is None:  # old versions of Flet use overlay
             registry = self.page.overlay
         registry.append(self.file_picker)
         if getattr(self.page, "web", False):
-            # No navegador, o botão direito mostraria o menu do navegador, não o da galeria.
+            # In the browser, the right button would show the browser menu, not the gallery one.
             self.browser_menu = ft.BrowserContextMenu()
             registry.append(self.browser_menu)
         self.tabs = ft.Tabs(
@@ -92,32 +96,48 @@ class PersonalLibraryApp:
         status_bar = ft.Row(controls=[self.status_text, self.progress, self.btn_cancel,
                                       self.btn_log],
                             vertical_alignment=ft.CrossAxisAlignment.CENTER)
-        self.page.add(ft.Column(controls=[header, self.tabs, ft.Divider(height=1), status_bar,
-                                          self.log_panel], spacing=6, expand=True))
+        # [1] is the tabs, or what replace_tabs puts there (the reader, in the web version).
+        self.content = ft.Column(controls=[header, self.tabs, ft.Divider(height=1), status_bar,
+                                           self.log_panel], spacing=6, expand=True)
+        self.page.add(self.keys.wrap(self.content))
+        self.page.on_keyboard_event = self.on_page_key
+        # Window focus events only exist on desktop; on the web this never fires.
+        self.page.window.on_event = self.keys.on_window_event
         self.library_picker.refresh()
         self.import_tab.refresh()
         self.export_tab.refresh()
         self.page.update()
 
     async def use_app_context_menus(self) -> None:
-        """Só na versão web: desliga o menu do navegador (senão o "Abrir" da galeria não
-        aparece com o botão direito). No app de desktop não há o que fazer."""
+        """Web version only: turns off the browser menu (otherwise the "Abrir" of the gallery
+        does not show up with the right button). In the desktop app there is nothing to do."""
         menu = getattr(self, "browser_menu", None)
         if menu is None:
             return
         try:
             await menu.disable()
         except Exception:
-            logger.debug("não foi possível desligar o menu do navegador", exc_info=True)
+            logger.debug("could not turn off the browser menu", exc_info=True)
+
+    async def on_page_key(self, event: Any) -> None:
+        """Every key pressed in the window (page.on_keyboard_event)."""
+        self.keys.on_page_key(event)
+        await self.opener.on_key(event)
+
+    def replace_tabs(self, control: ft.Control | None) -> None:
+        """Shows `control` in place of the tabs (header and status bar stay); None brings
+        the tabs back as they were."""
+        self.content.controls[1] = control if control is not None else self.tabs
+        self.page.update()
 
     async def go_to_tab(self, index: int) -> None:
         self.tabs.selected_index = index
         self.page.update()
 
-    # ================================================================== biblioteca aberta
+    # ================================================================== open library
 
     async def open_library(self, path: str | Path | None) -> bool:
-        """Passa a usar a biblioteca em `path` (nas três abas). False se não for válida."""
+        """Switches to the library in `path` (in the three tabs). False if it is not valid."""
         folder = str(path or "").strip().strip('"')
         previous = self.library
         self.settings.library = folder
@@ -142,30 +162,35 @@ class PersonalLibraryApp:
         return self.library is not None
 
     def cli(self) -> LibraryCli | None:
-        """A ferramenta que altera a biblioteca (None se não estiver instalada)."""
+        """The tool that changes the library (None if it is not installed)."""
         return LibraryCli.find(self.settings.cli_path or None)
 
-    # ================================================================== serviços
+    # ================================================================== services
 
     def save(self) -> None:
-        """Cada aba guarda os próprios campos nas preferências; depois grava o arquivo."""
+        """Each tab stores its own fields in the settings; then the file is written."""
         for tab in (self.import_tab, self.export_tab, self.gallery):
             tab.store(self.settings)
         save_settings(self.settings)
 
     def log(self, message: str, error: bool = False) -> None:
-        """Registra a mensagem e mostra a última na barra de status."""
+        """Logs the message and shows the latest one in the status bar."""
         (logger.warning if error else logger.info)(message)
         color = ft.Colors.RED_700 if error else None
         self.log_view.controls.append(ft.Text(message, size=12, color=color, selectable=True))
         del self.log_view.controls[:-MAX_LOG_LINES]
         self.status_text.value, self.status_text.color = message, color
         if error:
-            self.log_panel.visible = True  # erro nunca fica escondido
+            self.log_panel.visible = True  # an error is never hidden
         self.page.update()
 
+    def log_errors(self, errors: list[str], limit: int = 20) -> None:
+        """The errors of a job, one per line (the first ones: the rest add nothing)."""
+        for error in errors[:limit]:
+            self.log(f"  ✗ {error}", True)
+
     def register_actions(self, *buttons: ft.Control) -> None:
-        """Botões que ficam desativados enquanto uma tarefa está rodando."""
+        """Buttons that stay disabled while a job is running."""
         self._action_buttons.extend(buttons)
 
     def set_busy(self, busy: bool) -> None:
@@ -186,7 +211,7 @@ class PersonalLibraryApp:
 
     async def run_job(self, func: Callable[..., Any], *args: Any, label: str,
                       cancellable: bool = True) -> Any:
-        """Roda `func` em outra thread mostrando o progresso, sem travar a janela."""
+        """Runs `func` in another thread showing the progress, without freezing the window."""
         updates: "queue.Queue[tuple[int, int, str]]" = queue.Queue()
         kwargs: dict[str, Any] = {"progress": lambda d, t, m: updates.put((d, t, m))}
         if cancellable:
@@ -217,7 +242,7 @@ class PersonalLibraryApp:
             self.log(f"Seletor de pastas indisponível ({exc}). Cole o caminho no campo.", True)
             return None
 
-    # ================================================================== eventos
+    # ================================================================== events
 
     def on_toggle_log(self, _event: Any) -> None:
         self.log_panel.visible = not self.log_panel.visible
@@ -230,7 +255,7 @@ class PersonalLibraryApp:
 
 
 async def main(page: ft.Page) -> None:
-    """Ponto de entrada passado para `ft.run`."""
+    """Entry point passed to `ft.run`."""
     page.title = APP_NAME
     page.theme_mode = ft.ThemeMode.LIGHT
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.INDIGO)
@@ -238,9 +263,9 @@ async def main(page: ft.Page) -> None:
     try:
         page.window.width, page.window.height = 1200, 860
         page.window.min_width, page.window.min_height = 900, 640
-        page.window.maximized = True  # mais linhas visíveis na revisão e na galeria
-    except Exception:  # janela não configurável (web/mobile): sem problema
-        logger.debug("window não configurável", exc_info=True)
+        page.window.maximized = True  # more visible rows in the review list and in the gallery
+    except Exception:  # window not configurable (web/mobile): no problem
+        logger.debug("window not configurable", exc_info=True)
     app = PersonalLibraryApp(page)
     app.build()
     await app.use_app_context_menus()

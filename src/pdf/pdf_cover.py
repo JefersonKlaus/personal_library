@@ -1,4 +1,4 @@
-"""Capa do livro: a primeira página do PDF como JPEG."""
+"""Cover of the book: the first page of the PDF as a JPEG."""
 from __future__ import annotations
 
 import logging
@@ -8,15 +8,15 @@ logger = logging.getLogger(__name__)
 
 
 def render_cover(pdf_path: Path, out_path: Path, max_side: int = 1400) -> bool:
-    """Renderiza a primeira página em JPEG.
+    """Renders the first page as a JPEG.
 
-    Precisa de `pypdfium2` e `Pillow`. Sem eles (ou se o PDF falhar) devolve
-    False e o livro fica sem capa.
+    Needs `pypdfium2` and `Pillow`. Without them (or if the PDF fails) it returns
+    False and the book is left without a cover.
     """
     try:
         import pypdfium2 as pdfium
     except ImportError:
-        logger.info("pypdfium2 não instalado; capas desativadas")
+        logger.info("pypdfium2 not installed; covers disabled")
         return False
 
     try:
@@ -33,7 +33,7 @@ def render_cover(pdf_path: Path, out_path: Path, max_side: int = 1400) -> bool:
         finally:
             document.close()
         return True
-    except Exception as exc:  # PDFs estranhos ou falta de Pillow
-        logger.warning("Não foi possível extrair a capa de %s: %s", pdf_path, exc)
+    except Exception as exc:  # odd PDFs or Pillow missing
+        logger.warning("Could not extract the cover of %s: %s", pdf_path, exc)
         out_path.unlink(missing_ok=True)
         return False

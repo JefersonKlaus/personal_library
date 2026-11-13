@@ -1,1 +1,1 @@
-"""A biblioteca de e-books: leitura, busca, formato OPF, renomear e a ferramenta que a altera."""
+"""The e-book library: reading, search, OPF format, renaming and the tool that changes it."""

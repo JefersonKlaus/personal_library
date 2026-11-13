@@ -1,6 +1,6 @@
-"""Cliente mínimo da API da Groq (chat no formato da API da OpenAI), sem dependências.
+"""Minimal client of the Groq API (chat in the OpenAI API format), with no dependencies.
 
-Só é usado quando o usuário marca "Usar Groq AI" na aba Importar.
+Only used when the user ticks "Usar Groq AI" in the Import tab.
 """
 from __future__ import annotations
 
@@ -14,15 +14,15 @@ import urllib.request
 from typing import Callable
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
-# GROQ_BASE_URL permite apontar para um proxy (ou um servidor de teste).
+# GROQ_BASE_URL allows pointing to a proxy (or to a test server).
 BASE_URL = os.environ.get("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-API_KEY_ENV = "GROQ_API_KEY"  # usada quando o campo da chave fica vazio
+API_KEY_ENV = "GROQ_API_KEY"  # used when the key field is left empty
 _RETRY_IN = re.compile(r"try again in ([\d.]+)(ms|s)", re.I)
 
 
 class GroqError(Exception):
-    """Falha ao consultar a Groq. `fatal` = não adianta seguir com os outros livros
-    (chave inválida, modelo inexistente, sem conexão)."""
+    """Failure while querying Groq. `fatal` = there is no point going on with the other
+    books (invalid key, non-existing model, no connection)."""
 
     def __init__(self, message: str, fatal: bool = False) -> None:
         super().__init__(message)
@@ -30,7 +30,7 @@ class GroqError(Exception):
 
 
 class GroqClient:
-    """Faz perguntas à Groq e devolve a resposta em JSON."""
+    """Asks questions to Groq and returns the answer as JSON."""
 
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL, base_url: str | None = None,
                  timeout: float = 60, max_retries: int = 4,
@@ -44,7 +44,7 @@ class GroqClient:
 
     def chat_json(self, system: str, user: str,
                   cancel: threading.Event | None = None) -> dict:
-        """Envia a conversa e devolve o objeto JSON que o modelo respondeu."""
+        """Sends the conversation and returns the JSON object the model answered."""
         body = json.dumps({
             "model": self.model, "temperature": 0,
             "response_format": {"type": "json_object"},
@@ -60,7 +60,7 @@ class GroqClient:
                 raise GroqError(f"Sem conexão com a Groq ({getattr(exc, 'reason', exc)}).",
                                 fatal=True) from exc
             if cancel is not None:
-                if cancel.wait(wait):  # espera, mas acorda na hora se o usuário cancelar
+                if cancel.wait(wait):  # waits, but wakes up at once if the user cancels
                     raise GroqError("cancelado")
             else:
                 self.sleep(wait)
@@ -75,7 +75,7 @@ class GroqClient:
             return json.loads(response.read().decode("utf-8"))
 
     def _handle_http_error(self, exc: urllib.error.HTTPError, attempt: int) -> float:
-        """Devolve quantos segundos esperar antes de tentar de novo, ou levanta GroqError."""
+        """Returns how many seconds to wait before trying again, or raises GroqError."""
         try:
             detail = json.loads(exc.read().decode("utf-8")).get("error", {}).get("message", "")
         except (ValueError, AttributeError, OSError):
@@ -103,8 +103,8 @@ class GroqClient:
 
 
 def _retry_after(exc: urllib.error.HTTPError, detail: str, attempt: int) -> float:
-    """Quanto esperar: o cabeçalho Retry-After, o 'try again in 7.5s' da mensagem ou
-    uma espera crescente (2, 4, 8... s), no máximo 60 s."""
+    """How long to wait: the Retry-After header, the 'try again in 7.5s' of the message or
+    a growing wait (2, 4, 8... s), at most 60 s."""
     header = exc.headers.get("retry-after") if exc.headers else None
     try:
         if header:
@@ -119,5 +119,5 @@ def _retry_after(exc: urllib.error.HTTPError, detail: str, attempt: int) -> floa
 
 
 def resolve_api_key(typed: str) -> str:
-    """A chave digitada ou, se vazia, a da variável de ambiente GROQ_API_KEY."""
+    """The typed key or, if empty, the one in the GROQ_API_KEY environment variable."""
     return (typed or "").strip() or os.environ.get(API_KEY_ENV, "").strip()

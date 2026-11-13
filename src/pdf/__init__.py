@@ -1,1 +1,1 @@
-"""Leitura de PDFs: metadados de dentro do arquivo e a capa (1ª página)."""
+"""Reading PDFs: metadata from inside the file and the cover (1st page)."""

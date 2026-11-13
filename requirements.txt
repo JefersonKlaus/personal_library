@@ -1,7 +1,7 @@
-# Mesmas dependências do pyproject.toml (para quem usa `pip install -r`).
-# cli = comando `flet run`; desktop = a janela do app.
+# Same dependencies as pyproject.toml (for whoever uses `pip install -r`).
+# cli = the `flet run` command; desktop = the app window.
 flet[cli,desktop]>=1.0.5
 pypdf>=4.0
-# Capa da 1ª página ao importar e miniaturas da galeria:
+# Cover from the 1st page when importing, and gallery thumbnails:
 pypdfium2
 Pillow

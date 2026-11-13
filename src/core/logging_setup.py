@@ -1,4 +1,4 @@
-"""Registro em arquivo para investigar problemas (~/.personal_library/app.log)."""
+"""File log to investigate problems (~/.personal_library/app.log)."""
 from __future__ import annotations
 
 import logging
@@ -7,14 +7,14 @@ from pathlib import Path
 
 from .paths import LOG_FILE
 
-# O logger do pacote do app ("src"): os módulos usam logging.getLogger(__name__), então
-# todos ficam abaixo dele. Calculado, e não escrito à mão, para não parar de gravar
-# em silêncio se o pacote mudar de nome outra vez.
+# The logger of the app package ("src"): the modules use logging.getLogger(__name__),
+# so they all sit below it. Computed instead of hard-coded, so that logging does not
+# silently stop if the package is renamed again.
 APP_LOGGER = __name__.partition(".")[0]
 
 
 def setup_logging(log_file: Path = LOG_FILE) -> Path | None:
-    """Configura um log rotativo; devolve o caminho ou None se não der para gravar."""
+    """Sets up a rotating log; returns the path, or None if it cannot be written."""
     try:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         handler = RotatingFileHandler(log_file, maxBytes=500_000, backupCount=2, encoding="utf-8")

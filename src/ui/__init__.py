@@ -1,1 +1,1 @@
-"""Interface Flet: janela com as abas Importar, Galeria e Exportar."""
+"""Flet interface: window with the Importar, Galeria and Exportar tabs."""

@@ -1,11 +1,11 @@
-"""Análise dos PDFs escolhidos: achar os arquivos, montar cada livro e marcar duplicados.
+"""Analysis of the chosen PDFs: find the files, build each book and mark duplicates.
 
-Regras de prioridade dos metadados de um livro:
-1. valores fixos de "Como importar" (@auth=ONE) vencem tudo;
-2. o nome do arquivo vence quando segue o padrão do usuário ou traz o volume
-   (o título de dentro do PDF, "One Punch Man", perderia o "Vol 18");
-3. senão, com "Preferir metadados de dentro do PDF", vale o que está no PDF;
-4. o PDF sempre completa o que faltou (por exemplo, o autor).
+Priority rules for the metadata of a book:
+1. fixed values of "Como importar" (@auth=ONE) beat everything;
+2. the file name wins when it follows the user pattern or carries the volume
+   (the title inside the PDF, "One Punch Man", would lose the "Vol 18");
+3. otherwise, with "Preferir metadados de dentro do PDF", what is in the PDF wins;
+4. the PDF always fills in what is still missing (the author, for instance).
 """
 from __future__ import annotations
 
@@ -18,25 +18,25 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from ..core.files import sha256_file
+from ..core.models import USABLE_STATUSES, BookEntry, ImportOptions, Status
+from ..core.text import fold, natural_key
 from ..parsing.filename_parser import ParsedName
 from ..parsing.import_spec import ImportSpec, PatternError, apply_spec, compile_spec
-from ..core.models import USABLE_STATUSES, BookEntry, ImportOptions, Status
-from ..pdf.pdf_reader import PdfInfo, is_junk_author, is_junk_title, looks_like_pdf, read_pdf_info
 from ..parsing.people import split_authors
-from ..core.text import fold, natural_key
 from ..parsing.volumes import looks_like_volume
+from ..pdf.pdf_reader import PdfInfo, is_junk_author, is_junk_title, looks_like_pdf, read_pdf_info
 
 ProgressFn = Callable[[int, int, str], None]
 _SUSPICIOUS_NOTES = ("nome fora do padrão", "o autor", "o título")
-# Observações que deixam o livro com "atenção" (e que o usuário deve conferir).
+# Notes that leave the book with "atenção" (and that the user should check).
 WARNING_NOTES = _SUSPICIOUS_NOTES + ("autor não encontrado", "PDF protegido", "mesmo título")
 
 
-# ---------------------------------------------------------------- arquivos
+# ---------------------------------------------------------------- files
 
 def find_pdfs(paths: Iterable[Path | str], recursive: bool = True,
               exclude: Path | None = None) -> list[Path]:
-    """Lista os PDFs de arquivos e pastas dados, sem repetir nem entrar em `exclude`."""
+    """Lists the PDFs of the given files and folders, without repeating or entering `exclude`."""
     seen: set[Path] = set()
     found: list[Path] = []
     excluded = exclude.resolve() if exclude else None
@@ -57,7 +57,7 @@ def find_pdfs(paths: Iterable[Path | str], recursive: bool = True,
             add(path)
         elif path.is_dir():
             for root, dirs, files in os.walk(path, onerror=lambda _err: None):
-                # pastas ocultas (inclui a de registros do app) ficam de fora
+                # hidden folders (including the app records one) are left out
                 dirs[:] = sorted(name for name in dirs if not name.startswith(".")) \
                     if recursive else []
                 for name in sorted(files):
@@ -66,10 +66,10 @@ def find_pdfs(paths: Iterable[Path | str], recursive: bool = True,
     return sorted(found, key=natural_key)
 
 
-# ---------------------------------------------------------------- um livro
+# ---------------------------------------------------------------- one book
 
 def build_entry(path: Path, options: ImportOptions) -> BookEntry:
-    """Analisa um PDF e devolve o livro com título, autor e volume escolhidos."""
+    """Analyses a PDF and returns the book with the chosen title, author and volume."""
     entry = BookEntry(source=path)
     spec = _spec_or_none(options.filename_pattern)
     parsed, matched = apply_spec(path.stem, spec, options.author_first)
@@ -97,7 +97,7 @@ def build_entry(path: Path, options: ImportOptions) -> BookEntry:
 def _spec_or_none(text: str) -> ImportSpec | None:
     try:
         return compile_spec(text)
-    except PatternError:  # a interface valida antes; aqui só não pode quebrar
+    except PatternError:  # the interface validates beforehand; here it just must not break
         return None
 
 
@@ -115,7 +115,7 @@ def _file_name_wins(spec: ImportSpec | None, matched: bool, entry: BookEntry) ->
 
 
 def _check_file(entry: BookEntry, path: Path) -> bool:
-    """Confere se o arquivo existe, não está vazio e é PDF; senão marca erro."""
+    """Checks that the file exists, is not empty and is a PDF; otherwise marks an error."""
     try:
         entry.size = path.stat().st_size
     except OSError as exc:
@@ -147,12 +147,12 @@ def _apply_pdf_info(entry: BookEntry, info: PdfInfo, options: ImportOptions,
             entry.title, entry.title_origin = pdf_title, "pdf"
         if pdf_author:
             entry.author, entry.author_origin = pdf_author, "pdf"
-    elif not entry.author and pdf_author:  # o PDF só completa o que faltou
+    elif not entry.author and pdf_author:  # the PDF only fills in what is missing
         entry.author, entry.author_origin = pdf_author, "pdf"
 
 
 def flag_suspicious_values(entry: BookEntry) -> None:
-    """'@name - @auth' em 'One Punch Man - Vol 01' põe 'Vol 01' no autor: avisa."""
+    """'@name - @auth' on 'One Punch Man - Vol 01' puts 'Vol 01' in the author: warns."""
     for label, value in (("autor", entry.author), ("título", entry.title)):
         if looks_like_volume(value):
             entry.note(f"o {label} '{value}' parece um volume: confira o padrão (use @vol)")
@@ -162,7 +162,7 @@ def flag_suspicious_values(entry: BookEntry) -> None:
 
 
 def normalize_authors(entry: BookEntry, unknown_author: str) -> None:
-    """'Assis, Machado de; Outro' -> 'Machado de Assis & Outro' (ou autor desconhecido)."""
+    """'Assis, Machado de; Outro' -> 'Machado de Assis & Outro' (or unknown author)."""
     names = split_authors(entry.author)
     if names:
         entry.author = " & ".join(names)
@@ -175,7 +175,7 @@ def normalize_authors(entry: BookEntry, unknown_author: str) -> None:
 
 def build_entries(files: list[Path], options: ImportOptions, progress: ProgressFn | None = None,
                   cancel: threading.Event | None = None) -> list[BookEntry]:
-    """Analisa os PDFs em paralelo, mantendo a ordem original."""
+    """Analyses the PDFs in parallel, keeping the original order."""
     entries: list[BookEntry] = []
     with ThreadPoolExecutor(max_workers=max(1, options.workers)) as pool:
         futures = [pool.submit(build_entry, path, options) for path in files]
@@ -191,14 +191,14 @@ def build_entries(files: list[Path], options: ImportOptions, progress: ProgressF
     return entries
 
 
-# ---------------------------------------------------------------- duplicados
+# ---------------------------------------------------------------- duplicates
 
 def book_key(title: str, authors: list[str], series: str = "",
              series_index: float | None = None) -> tuple:
-    """Identidade de um livro: título + autores + série + volume (sem caixa e acentos).
+    """Identity of a book: title + authors + series + volume (ignoring case and accents).
 
-    Volumes de uma coleção têm o mesmo título e autor ("One Punch Man", ONE) e só se
-    diferenciam pelo número, então o volume precisa entrar na comparação.
+    Volumes of a collection have the same title and author ("One Punch Man", ONE) and
+    only differ by the number, so the volume has to take part in the comparison.
     """
     def norm(text: str) -> str:
         return fold(re.sub(r"[\W_]+", " ", text or "")).strip()
@@ -214,15 +214,15 @@ def entry_key(entry: BookEntry) -> tuple:
 
 
 def mark_duplicates(entries: list[BookEntry], options: ImportOptions) -> int:
-    """Marca cópias idênticas e avisa sobre o mesmo livro em arquivos diferentes.
-    Devolve quantos arquivos foram marcados como duplicados."""
+    """Marks identical copies and warns about the same book in different files.
+    Returns how many files were marked as duplicates."""
     duplicates = mark_identical_files(entries, options)
     warn_same_book(entries)
     return duplicates
 
 
 def mark_identical_files(entries: list[BookEntry], options: ImportOptions) -> int:
-    """Cópias com o mesmo conteúdo: fica a de melhor metadado, as outras são marcadas."""
+    """Copies with the same content: the one with the best metadata stays, the others are marked."""
     def quality(entry: BookEntry) -> tuple[bool, bool, bool]:
         return (entry.author != options.unknown_author, entry.author_origin == "pdf",
                 entry.title_origin == "pdf")
@@ -244,7 +244,7 @@ def mark_identical_files(entries: list[BookEntry], options: ImportOptions) -> in
 
 
 def warn_same_book(entries: list[BookEntry]) -> None:
-    """Mesmo título, autor e volume em arquivos diferentes: avisa (pode ser o mesmo livro)."""
+    """Same title, author and volume in different files: warns (it may be the same book)."""
     first_by_key: dict[tuple, BookEntry] = {}
     for entry in entries:
         if entry.status not in USABLE_STATUSES or any(n.startswith("idêntico a")
@@ -257,5 +257,5 @@ def warn_same_book(entries: list[BookEntry]) -> None:
 
 
 def summarize(entries: Iterable[BookEntry]) -> Counter:
-    """Conta os livros por situação."""
+    """Counts the books by state."""
     return Counter(entry.status for entry in entries)

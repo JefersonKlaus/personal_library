@@ -1,42 +1,42 @@
-"""Modo automático: deduz título, autor, ano e volume do nome do arquivo."""
+"""Automatic mode: works out title, author, year and volume from the file name."""
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
-from .people import author_score, looks_like_person
 from ..core.text import extract_year, normalize_text, strip_noise
+from .people import author_score, looks_like_person
 from .volumes import VOL_TRAILING, match_volume, volume_from
 
-SEPARATOR = re.compile(r"\s+[-–—]\s+")  # " - " entre as partes do nome
+SEPARATOR = re.compile(r"\s+[-–—]\s+")  # " - " between the parts of the name
 
 
 @dataclass
 class ParsedName:
-    """Resultado de interpretar um nome de arquivo."""
+    """Result of interpreting a file name."""
 
     title: str
     author: str = ""
     year: int | None = None
     series: str = ""
-    series_index: float | None = None  # número do volume
+    series_index: float | None = None  # number of the volume
     publisher: str = ""
     language: str = ""
     tags: list[str] = field(default_factory=list)
-    series_from_name: bool = False  # série veio do @name (há volume, mas não @series)
+    series_from_name: bool = False  # series came from @name (there is a volume, but no @series)
 
 
 def _title_and_author(text: str, author_first: bool) -> tuple[str, str]:
-    """Separa título e autor de um texto já limpo (sem ano nem volume)."""
+    """Splits title and author out of already cleaned text (no year, no volume)."""
     parts = SEPARATOR.split(text)
     if len(parts) >= 2:
         head, tail = parts[0], " - ".join(parts[1:])
         last, rest = parts[-1], " - ".join(parts[:-1])
-        # (autor, título) para cada orientação possível
+        # (author, title) for each possible orientation
         preferred = (head, tail) if author_first else (last, rest)
         other = (last, rest) if author_first else (head, tail)
-        # A orientação escolhida pelo usuário vence, a não ser que o outro lado
-        # pareça mais com autor(es) (ex.: "Física Básica - Ana Lima & Rui Dias").
+        # The orientation chosen by the user wins, unless the other side
+        # looks more like author(s) (e.g. "Física Básica - Ana Lima & Rui Dias").
         if author_score(preferred[0]) >= author_score(other[0]):
             author, title = preferred
         else:
@@ -54,15 +54,15 @@ def _title_and_author(text: str, author_first: bool) -> tuple[str, str]:
 
 
 def _split_volume(text: str) -> tuple[str, str, tuple[str, float]] | None:
-    """Acha o volume e a obra a que ele pertence: (obra, resto, (rótulo, número)).
+    """Finds the volume and the work it belongs to: (work, rest, (label, number)).
 
-    O volume fica colado na obra: em "One Punch Man - Vol 18 - ONE" e em
-    "ONE - One Punch Man - Vol 18" a obra é a parte logo antes do volume, e o
-    que sobra ("ONE") é o autor.
+    The volume sits right next to the work: in "One Punch Man - Vol 18 - ONE" and in
+    "ONE - One Punch Man - Vol 18" the work is the part just before the volume, and
+    what is left ("ONE") is the author.
     """
     parts = SEPARATOR.split(text)
     if len(parts) >= 2:
-        for index in range(len(parts) - 1, -1, -1):  # o volume costuma vir no fim
+        for index in range(len(parts) - 1, -1, -1):  # the volume usually comes at the end
             volume = match_volume(parts[index])
             if volume:
                 name_index = index - 1 if index > 0 else index + 1
@@ -77,7 +77,7 @@ def _split_volume(text: str) -> tuple[str, str, tuple[str, float]] | None:
 
 
 def automatic_values(stem: str, author_first: bool) -> dict[str, str]:
-    """Partes deduzidas do nome do arquivo, ainda em texto: title, author, year, volume."""
+    """Parts worked out from the file name, still as text: title, author, year, volume."""
     original = normalize_text(stem)
     text = strip_noise(original)
     text, year = extract_year(text)
@@ -95,11 +95,11 @@ def automatic_values(stem: str, author_first: bool) -> dict[str, str]:
 
 
 def compose(values: dict[str, str]) -> ParsedName:
-    """Monta o resultado a partir das partes em texto: cada parte vai para o seu campo.
+    """Builds the result from the text parts: each part goes to its own field.
 
-    O título é exatamente o @name. O volume vira o número na série; sem @series, a
-    série é o próprio @name, porque a biblioteca só guarda o número dentro de uma série
-    (sem série ela descarta o volume).
+    The title is exactly the @name. The volume becomes the number in the series; without
+    @series, the series is the @name itself, because the library only keeps the number
+    inside a series (with no series it drops the volume).
     """
     name = values.get("title", "").strip()
     series = values.get("series", "").strip()
@@ -119,10 +119,10 @@ def compose(values: dict[str, str]) -> ParsedName:
 
 
 def parse_filename(stem: str, author_first: bool = True) -> ParsedName:
-    """Descobre título, autor, ano e volume a partir do nome do arquivo (sem extensão).
+    """Works out title, author, year and volume from the file name (without extension).
 
-    Reconhece "Autor - Título", "Título - Autor", "Título (Autor)", "Título by/por
-    Autor" e volumes ("Vol 18", "Volume 41", "v03", "- 03"). Quando nada indica o
-    autor, devolve só o título.
+    Recognises "Autor - Título", "Título - Autor", "Título (Autor)", "Título by/por
+    Autor" and volumes ("Vol 18", "Volume 41", "v03", "- 03"). When nothing points to
+    the author, returns only the title.
     """
     return compose(automatic_values(stem, author_first))

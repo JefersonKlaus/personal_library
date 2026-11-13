@@ -1,4 +1,4 @@
-"""Miniaturas das capas para a galeria (com cache em disco)."""
+"""Cover thumbnails for the gallery (cached on disk)."""
 from __future__ import annotations
 
 import hashlib
@@ -10,14 +10,14 @@ from .database import LibraryBook
 
 logger = logging.getLogger(__name__)
 
-THUMB_SIZE = (200, 300)  # 2:3, proporção de capa de livro
+THUMB_SIZE = (200, 300)  # 2:3, the aspect ratio of a book cover
 
 
 def thumbnail(book: LibraryBook, library: Path, cache_dir: Path | None,
               size: tuple[int, int] = THUMB_SIZE) -> bytes | None:
-    """JPEG pequeno da capa (com cache em disco). Nunca levanta exceção.
+    """Small JPEG of the cover (cached on disk). Never raises.
 
-    Sem Pillow devolve a capa original, que funciona, só é mais pesada.
+    Without Pillow it returns the original cover, which works, just heavier.
     """
     cover = book.cover_path(library)
     if cover is None:
@@ -46,6 +46,6 @@ def thumbnail(book: LibraryBook, library: Path, cache_dir: Path | None,
             temp.write_bytes(data)
             temp.replace(cached)
         return data
-    except Exception as exc:  # capa corrompida, sem permissão, disco cheio...
-        logger.warning("Capa ilegível de %s: %s", book.title, exc)
+    except Exception as exc:  # corrupt cover, no permission, disk full...
+        logger.warning("Unreadable cover of %s: %s", book.title, exc)
         return None

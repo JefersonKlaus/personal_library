@@ -1,1 +1,1 @@
-"""Aba Importar (a lógica): analisar os PDFs, completar com IA e colocar na biblioteca."""
+"""Import tab (the logic): analyse the PDFs, fill in with AI and put them in the library."""

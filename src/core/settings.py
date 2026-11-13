@@ -1,4 +1,4 @@
-"""Preferências do usuário salvas em ~/.personal_library/settings.json."""
+"""User settings saved in ~/.personal_library/settings.json."""
 from __future__ import annotations
 
 import json
@@ -16,17 +16,17 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Settings:
-    """O que o app lembra entre uma execução e outra."""
+    """What the app remembers between one run and the next."""
 
-    library: str = ""  # biblioteca usada pelas três abas
-    cli_path: str = ""  # ferramenta da biblioteca, se não for achada sozinha
-    destination: str = ""  # pasta da aba Exportar
+    library: str = ""  # library used by the three tabs
+    cli_path: str = ""  # library tool, when it is not found on its own
+    destination: str = ""  # folder of the Export tab
     gallery_sort: str = "added"
     export_folder_per_book: bool = True
     export_opf: bool = True
     export_cover: bool = True
-    ai_enabled: bool = False  # "Usar Groq AI" na aba Importar
-    groq_api_key: str = ""  # guardada em texto puro no settings.json do usuário
+    ai_enabled: bool = False  # "Usar Groq AI" in the Import tab
+    groq_api_key: str = ""  # kept as plain text in the user's settings.json
     groq_model: str = DEFAULT_MODEL
     last_sources: list[str] = field(default_factory=list)
     options: dict[str, Any] = field(default_factory=dict)
@@ -39,7 +39,7 @@ class Settings:
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> Settings:
-    """Lê as preferências; arquivo ausente, corrompido ou com tipos errados vira padrão."""
+    """Reads the settings; a missing, corrupt or wrongly typed file falls back to defaults."""
     try:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -56,7 +56,7 @@ def load_settings(path: Path = SETTINGS_FILE) -> Settings:
 
 
 def save_settings(settings: Settings, path: Path = SETTINGS_FILE) -> bool:
-    """Grava as preferências; devolve False se não conseguir (não é crítico)."""
+    """Writes the settings; returns False if it cannot (not critical)."""
     try:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,5 +64,5 @@ def save_settings(settings: Settings, path: Path = SETTINGS_FILE) -> bool:
                         encoding="utf-8")
         return True
     except OSError as exc:
-        logger.warning("Não foi possível salvar as preferências: %s", exc)
+        logger.warning("Could not save the settings: %s", exc)
         return False

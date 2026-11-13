@@ -1,9 +1,9 @@
-"""Preencher título, autor, série, volume... com IA (Groq), um PDF por vez.
+"""Filling in title, author, series, volume... with AI (Groq), one PDF at a time.
 
-A IA recebe pistas de cada livro (nome do arquivo, metadados do PDF, o que o app
-já deduziu e o texto das primeiras páginas) e responde um JSON com os dados.
-Regras: valores fixos de "Como importar" (@auth=ONE) continuam valendo; o que a IA
-não souber (null) mantém o que o app já tinha deduzido.
+The AI receives clues about each book (file name, PDF metadata, what the app already
+worked out and the text of the first pages) and answers with a JSON holding the data.
+Rules: fixed values of "Como importar" (@auth=ONE) still hold; whatever the AI does
+not know (null) keeps what the app had already worked out.
 """
 from __future__ import annotations
 
@@ -14,19 +14,19 @@ import threading
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .analysis import WARNING_NOTES, flag_suspicious_values, normalize_authors
-from .groq_client import GroqClient, GroqError
 from ..core.models import USABLE_STATUSES, BookEntry, Status
 from ..pdf.pdf_reader import first_pages_text, is_junk_author, is_junk_title, read_pdf_info
+from .analysis import WARNING_NOTES, flag_suspicious_values, normalize_authors
+from .groq_client import GroqClient, GroqError
 
 logger = logging.getLogger(__name__)
 ProgressFn = Callable[[int, int, str], None]
 LOW_CONFIDENCE = 0.5
 LOW_CONFIDENCE_NOTE = "IA pouco confiante: confira os dados"
 NO_ANSWER_NOTE = "IA não respondeu"
-# Observações que deixam o livro com "atenção" (as da análise e as da IA).
+# Notes that leave the book with "atenção" (those of the analysis and those of the AI).
 _WARNINGS = WARNING_NOTES + (LOW_CONFIDENCE_NOTE, NO_ANSWER_NOTE)
-# Observações que a resposta da IA torna desatualizadas.
+# Notes that the AI answer makes out of date.
 _RESOLVED_BY_AI = ("nome fora do padrão", "autor não encontrado", "o autor", "o título")
 
 SYSTEM_PROMPT = """You identify books (including comics and manga) from limited clues.
@@ -52,7 +52,7 @@ Rules:
 
 @dataclass
 class AiBook:
-    """A resposta da IA, já validada."""
+    """The answer of the AI, already validated."""
 
     title: str = ""
     authors: list[str] = field(default_factory=list)
@@ -69,7 +69,7 @@ def _text(value: object, limit: int = 300) -> str:
 
 
 def parse_answer(data: dict) -> AiBook:
-    """Converte o JSON da IA, ignorando tipos errados e valores sem sentido."""
+    """Converts the JSON of the AI, ignoring wrong types and meaningless values."""
     authors = data.get("authors")
     if isinstance(authors, str):
         authors = [authors]
@@ -98,7 +98,7 @@ def parse_answer(data: dict) -> AiBook:
 
 
 def book_clues(entry: BookEntry) -> dict:
-    """O que a IA recebe sobre um livro (nada além disso sai do computador)."""
+    """What the AI receives about a book (nothing beyond this leaves the computer)."""
     info = read_pdf_info(entry.source)
     return {
         "file_name": entry.source.name,
@@ -119,10 +119,11 @@ def ask_ai(client: GroqClient, entry: BookEntry,
 
 
 def _other_standalone_book(entry: BookEntry, answer: AiBook) -> bool:
-    """A IA reconheceu, com segurança, um livro avulso diferente da série deduzida.
+    """The AI confidently recognised a standalone book different from the series worked out.
 
-    Ex.: "livro final v2.pdf" virou a série "livro final", vol. 2, mas a IA diz que é
-    "O Alienista", sem série. Se a IA só repete o nome da série (Naruto), a série fica."""
+    E.g. "livro final v2.pdf" became the series "livro final", vol. 2, but the AI says it
+    is "O Alienista", with no series. If the AI only repeats the series name (Naruto), the
+    series stays."""
     return (bool(answer.title) and not answer.series and answer.volume is None
             and answer.confidence >= LOW_CONFIDENCE and bool(entry.series)
             and entry.series.casefold() != answer.title.casefold())
@@ -130,7 +131,7 @@ def _other_standalone_book(entry: BookEntry, answer: AiBook) -> bool:
 
 def apply_answer(entry: BookEntry, answer: AiBook, fixed: dict[str, str],
                  unknown_author: str = "Unknown") -> None:
-    """Põe a resposta no livro. Valores fixos ficam; o que a IA não sabe, também."""
+    """Puts the answer into the book. Fixed values stay; so does what the AI does not know."""
     if answer.title and "title" not in fixed:
         entry.title, entry.title_origin = answer.title, "ia"
     if answer.authors and "author" not in fixed:
@@ -139,16 +140,16 @@ def apply_answer(entry: BookEntry, answer: AiBook, fixed: dict[str, str],
         entry.series = answer.series
     if answer.volume is not None and "volume" not in fixed:
         entry.series_index = answer.volume
-        entry.series = entry.series or entry.title  # volume só existe dentro de uma série
+        entry.series = entry.series or entry.title  # a volume only exists inside a series
     elif _other_standalone_book(entry, answer) and not {"series", "volume"} & fixed.keys():
-        entry.series, entry.series_index = "", None  # o "volume" do nome do arquivo era engano
+        entry.series, entry.series_index = "", None  # the "volume" of the file name was a mistake
     if answer.year and "year" not in fixed:
         entry.year = answer.year
     if answer.publisher and "publisher" not in fixed:
         entry.publisher = answer.publisher
     if answer.language and "language" not in fixed:
         entry.language = answer.language
-    # Reavalia os avisos com os dados novos.
+    # Re-checks the warnings with the new data.
     entry.notes = [note for note in entry.notes if not note.startswith(_RESOLVED_BY_AI)]
     normalize_authors(entry, unknown_author)
     entry.note(f"preenchido pela IA ({answer.confidence:.0%} de confiança)")
@@ -165,21 +166,21 @@ class AiReport:
     done: int = 0
     failed: int = 0
     cancelled: bool = False
-    stopped: str = ""  # erro que interrompeu tudo (chave inválida, sem conexão...)
+    stopped: str = ""  # error that stopped everything (invalid key, no connection...)
     errors: list[str] = field(default_factory=list)
 
 
 def fill_with_ai(entries: list[BookEntry], client: GroqClient, fixed: dict[str, str],
                  unknown_author: str = "Unknown", progress: ProgressFn | None = None,
                  cancel: threading.Event | None = None) -> AiReport:
-    """Consulta a IA para cada livro que vai ser importado, um por vez."""
+    """Queries the AI for each book that is going to be imported, one at a time."""
     todo = [entry for entry in entries if entry.selected and entry.status in USABLE_STATUSES]
     report = AiReport(total=len(todo))
     for index, entry in enumerate(todo, start=1):
         if cancel is not None and cancel.is_set():
             report.cancelled = True
             break
-        if progress:  # antes de perguntar: a resposta pode demorar (ou esperar o limite)
+        if progress:  # before asking: the answer may take a while (or wait for the rate limit)
             progress(index - 1, report.total, f"{entry.source.name} (perguntando à IA)")
         try:
             apply_answer(entry, ask_ai(client, entry, cancel), fixed, unknown_author)
@@ -189,7 +190,7 @@ def fill_with_ai(entries: list[BookEntry], client: GroqClient, fixed: dict[str, 
                 report.cancelled = True
                 break
             entry.note(f"{NO_ANSWER_NOTE}: {exc}")
-            entry.status = Status.WARNING  # ficou só com o que o app deduziu: conferir
+            entry.status = Status.WARNING  # left with only what the app worked out: needs checking
             report.failed += 1
             report.errors.append(f"{entry.source.name}: {exc}")
             if exc.fatal:

@@ -1,12 +1,16 @@
-"""Operações de arquivo seguras: cópia verificada, espaço em disco e desfazer.
+"""File operations: verified copy, free disk space, undo, and opening a file with the
+default program of the system.
 
-Desfazer usa um "manifesto": a lista do que foi criado, gravada no destino.
+Undo uses a "manifest": the list of what was created, written in the destination.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import subprocess
+import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -16,12 +20,22 @@ MANIFEST_DIR = ".personal_library"
 ProgressFn = Callable[[int, int, str], None]
 
 
+def open_with_system(path: Path) -> None:
+    """Opens a file or folder with the default program of the system."""
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
+
 class FileOperationError(Exception):
-    """Erro esperado ao gravar arquivos (espaço, verificação, destino inválido)."""
+    """Expected error while writing files (space, verification, invalid destination)."""
 
 
 def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
-    """Hash SHA-256 do arquivo, lido em blocos."""
+    """SHA-256 hash of the file, read in blocks."""
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for block in iter(lambda: handle.read(chunk_size), b""):
@@ -30,7 +44,7 @@ def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
 
 
 def copy_verified(source: Path, target: Path, expected_sha256: str | None = None) -> None:
-    """Copia e confere tamanho e conteúdo. Em caso de erro, não deixa a cópia."""
+    """Copies and checks size and content. On error, leaves no copy behind."""
     try:
         shutil.copy2(source, target)
         if target.stat().st_size != source.stat().st_size:
@@ -50,7 +64,7 @@ def ensure_free_space(folder: Path, needed: int) -> None:
 
 
 def make_dirs(path: Path) -> list[str]:
-    """Cria a pasta e devolve as pastas novas (da mais externa para a interna)."""
+    """Creates the folder and returns the new folders (outermost to innermost)."""
     missing: list[Path] = []
     current = path
     while not current.exists():
@@ -61,19 +75,19 @@ def make_dirs(path: Path) -> list[str]:
 
 
 def remove_empty_dirs(created: list[str]) -> None:
-    """Apaga as pastas criadas, de dentro para fora, enquanto estiverem vazias."""
+    """Deletes the created folders, innermost first, while they are empty."""
     for directory in reversed(created):
         try:
             Path(directory).rmdir()
         except OSError:
-            break  # não está vazia (ou sumiu): para de subir
+            break  # not empty (or gone): stop going up
 
 
-# ---------------------------------------------------------------- desfazer
+# ---------------------------------------------------------------- undo
 
 @dataclass
 class CreatedFiles:
-    """O que uma operação criou no disco (para poder desfazer)."""
+    """What an operation created on disk (so it can be undone)."""
 
     files: list[str] = field(default_factory=list)
     created_dirs: list[str] = field(default_factory=list)
@@ -98,7 +112,7 @@ def write_manifest(dest_root: Path, records: list[CreatedFiles]) -> Path:
 
 
 def latest_manifest(dest_root: Path) -> Path | None:
-    """Último registro ainda não desfeito neste destino, ou None."""
+    """Latest record in this destination that was not undone yet, or None."""
     folder = Path(dest_root) / MANIFEST_DIR
     if not folder.is_dir():
         return None
@@ -108,7 +122,7 @@ def latest_manifest(dest_root: Path) -> Path | None:
 
 
 def undo_manifest(manifest: Path, progress: ProgressFn | None = None) -> UndoReport:
-    """Apaga o que foi criado (arquivos e pastas vazias)."""
+    """Deletes what was created (files and empty folders)."""
     manifest = Path(manifest)
     data = json.loads(manifest.read_text(encoding="utf-8"))
     records = [CreatedFiles(**item) for item in data.get("records", [])]

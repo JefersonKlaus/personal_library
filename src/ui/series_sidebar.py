@@ -1,27 +1,27 @@
-"""Barra lateral da Galeria: escolher uma série (ou todas) e renomear uma série."""
+"""Sidebar of the Galeria tab: choose a series (or all) and rename a series."""
 from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
 import flet as ft
 
-from ..library.database import LibraryBook
-from ..library.search import NO_SERIES, series_counts
-from ..library.renamer import titles_like_series
 from ..core.text import fold
+from ..library.database import LibraryBook
+from ..library.renamer import titles_like_series
+from ..library.search import NO_SERIES, series_counts
 
-SelectFn = Callable[[str | None], Awaitable[None]]  # None = todos os livros
-RenameFn = Callable[[str, str, bool], Awaitable[None]]  # (antigo, novo, renomear títulos)
+SelectFn = Callable[[str | None], Awaitable[None]]  # None = every book
+RenameFn = Callable[[str, str, bool], Awaitable[None]]  # (old, new, rename titles)
 
 
 class SeriesSidebar:
-    """Lista 'Todos os livros', 'Sem série' e cada série, com o botão de renomear."""
+    """Lists 'Todos os livros', 'Sem série' and each series, with the rename button."""
 
     def __init__(self, page: Any, on_select: SelectFn, on_rename: RenameFn) -> None:
         self.page = page
         self.on_select = on_select
         self.on_rename = on_rename
-        self.selected: str | None = None  # None = todos os livros
+        self.selected: str | None = None  # None = every book
         self.books: list[LibraryBook] = []
         self.list_view = ft.ListView(controls=[], spacing=2, expand=True)
         self.container = ft.Container(
@@ -29,10 +29,10 @@ class SeriesSidebar:
             content=ft.Column(controls=[ft.Text("Séries", weight=ft.FontWeight.BOLD),
                                         self.list_view], spacing=6, expand=True))
 
-    # ------------------------------------------------------------------ lista
+    # ------------------------------------------------------------------ list
 
     def refresh(self, books: list[LibraryBook]) -> None:
-        """Remonta a lista; se a série escolhida sumiu (renomeada/apagada), volta a 'Todos'."""
+        """Rebuilds the list; if the chosen series is gone (renamed/deleted), goes back to 'Todos'."""
         self.books = books
         series = series_counts(books)
         names = {name for name, _count in series}
@@ -58,7 +58,7 @@ class SeriesSidebar:
                     weight=ft.FontWeight.BOLD if selected else None),
             ft.Text(str(count), size=11, color=ft.Colors.GREY_700),
         ]
-        if value:  # só séries de verdade podem ser renomeadas
+        if value:  # only real series can be renamed
             controls.append(ft.IconButton(
                 icon=ft.Icons.EDIT, icon_size=16, tooltip="Renomear série",
                 visual_density=ft.VisualDensity.COMPACT, on_click=self._rename_handler(value)))
@@ -70,13 +70,13 @@ class SeriesSidebar:
             on_click=self._select_handler(value))
 
     def _select_handler(self, value: str | None) -> Callable[[Any], Any]:
-        async def handler(_event: Any) -> None:  # async def: o Flet só espera funções async
+        async def handler(_event: Any) -> None:  # async def: Flet only awaits async functions
             self.selected = value
             self.refresh(self.books)
             await self.on_select(value)
         return handler
 
-    # ------------------------------------------------------------------ renomear
+    # ------------------------------------------------------------------ renaming
 
     def _rename_handler(self, series: str) -> Callable[[Any], Any]:
         def handler(_event: Any) -> None:

@@ -1,8 +1,8 @@
-"""Exportar: copia livros da biblioteca para outra pasta, com os metadados ao lado.
+"""Export: copies books of the library to another folder, with the metadata next to them.
 
-Cada livro vira `Autor/Título/Título - Autor.pdf` (e os outros formatos que tiver),
-com `Título - Autor.opf` (todos os metadados) e `cover.jpg`. A pasta pode ser
-adicionada em outra biblioteca. A biblioteca de origem só é lida, nunca alterada.
+Each book becomes `Autor/Título/Título - Autor.pdf` (and the other formats it has),
+with `Título - Autor.opf` (all the metadata) and `cover.jpg`. The folder can be added
+to another library. The source library is only read, never changed.
 """
 from __future__ import annotations
 
@@ -17,11 +17,11 @@ from typing import Callable
 
 from ..core.files import (CreatedFiles, FileOperationError, copy_verified, ensure_free_space,
                     make_dirs, remove_empty_dirs, write_manifest)
+from ..core.models import Status
+from ..core.text import book_stem, fold, sanitize_component
 from ..library.database import LibraryBook
 from ..library.location import find_library_root
 from ..library.opf import OpfData, render_opf
-from ..core.models import Status
-from ..core.text import book_stem, fold, sanitize_component
 
 logger = logging.getLogger(__name__)
 ProgressFn = Callable[[int, int, str], None]
@@ -29,9 +29,9 @@ ProgressFn = Callable[[int, int, str], None]
 
 @dataclass
 class ExportOptions:
-    """Como os livros são gravados no destino."""
+    """How the books are written in the destination."""
 
-    folder_per_book: bool = True  # Autor/Título/arquivo
+    folder_per_book: bool = True  # Autor/Título/file
     write_opf: bool = True
     include_cover: bool = True
     max_name_length: int = 80
@@ -40,10 +40,10 @@ class ExportOptions:
 
 @dataclass
 class ExportItem:
-    """Um livro da biblioteca e para onde cada arquivo dele vai."""
+    """A book of the library and where each of its files goes."""
 
     book: LibraryBook
-    files: list[tuple[Path, Path]] = field(default_factory=list)  # (origem, destino)
+    files: list[tuple[Path, Path]] = field(default_factory=list)  # (source, destination)
     opf: Path | None = None
     cover: tuple[Path, Path] | None = None
     status: Status = Status.READY
@@ -66,7 +66,7 @@ class ExportReport:
 
 
 def book_opf_data(book: LibraryBook) -> OpfData:
-    """Todos os metadados do livro, como estão na biblioteca."""
+    """All the metadata of the book, as it is in the library."""
     return OpfData(
         title=book.title, authors=book.authors or ["Unknown"],
         author_sort=book.author_sort, title_sort=book.title_sort,
@@ -77,10 +77,10 @@ def book_opf_data(book: LibraryBook) -> OpfData:
         identifiers=book.identifiers, comments=book.comments)
 
 
-# ---------------------------------------------------------------- planejamento
+# ---------------------------------------------------------------- planning
 
 def _source_files(book: LibraryBook, library: Path) -> list[tuple[str, Path]]:
-    """Formatos que existem no disco, com o PDF primeiro."""
+    """Formats that exist on disk, with the PDF first."""
     found = []
     for fmt in sorted(book.formats, key=lambda item: (item != "PDF", item)):
         path = book.format_path(library, fmt)
@@ -98,7 +98,7 @@ def _same_size(a: Path, b: Path) -> bool:
 
 def _free_targets(base: Path, stem: str, sources: list[tuple[str, Path]], taken: set[str],
                   folder_per_book: bool) -> tuple[list[tuple[Path, Path]], bool]:
-    """Acha caminhos livres (acrescenta ' (2)', ' (3)'...). Devolve (destinos, já_existe)."""
+    """Finds free paths (adds ' (2)', ' (3)'...). Returns (destinations, already_exists)."""
     attempt = 1
     while True:
         suffix = "" if attempt == 1 else f" ({attempt})"
@@ -116,12 +116,12 @@ def _free_targets(base: Path, stem: str, sources: list[tuple[str, Path]], taken:
 
 def plan_export(books: list[LibraryBook], library: Path, dest_root: Path,
                 options: ExportOptions) -> list[ExportItem]:
-    """Decide o caminho de cada arquivo no destino (sem tocar no disco)."""
+    """Decides the path of each file in the destination (without touching the disk)."""
     library, dest_root = Path(library), Path(dest_root)
     limit = options.max_name_length
     taken: set[str] = set()
-    # Volumes com o mesmo título e autor ("One Punch Man", ONE) levam o volume no
-    # nome do arquivo; livros comuns ficam com o nome de sempre.
+    # Volumes with the same title and author ("One Punch Man", ONE) carry the volume in
+    # the file name; ordinary books keep their usual name.
     same_name = Counter((fold(b.title), fold(b.authors_text)) for b in books)
     items: list[ExportItem] = []
     for book in books:
@@ -155,11 +155,11 @@ def _plan_sidecars(item: ExportItem, library: Path, options: ExportOptions) -> N
                       else main_target.with_suffix(".jpg"))
 
 
-# ---------------------------------------------------------------- cópia
+# ---------------------------------------------------------------- copying
 
 def _export_one(item: ExportItem) -> CreatedFiles:
-    """Copia os arquivos (como .part), grava capa e OPF e só então dá o nome final:
-    quem vigia a pasta nunca vê o livro sem os metadados ao lado."""
+    """Copies the files (as .part), writes cover and OPF and only then gives the final
+    name: whoever watches the folder never sees the book without the metadata next to it."""
     created = make_dirs(item.target.parent)
     temps = [(target.with_name(target.name + ".part"), target) for _src, target in item.files]
     written: list[Path] = []
@@ -188,7 +188,7 @@ def _export_one(item: ExportItem) -> CreatedFiles:
 def export_books(books: list[LibraryBook], library: Path, dest_root: Path,
                  options: ExportOptions, progress: ProgressFn | None = None,
                  cancel: threading.Event | None = None) -> tuple[ExportReport, list[ExportItem]]:
-    """Copia os livros para `dest_root`. Devolve o relatório e a situação de cada livro."""
+    """Copies the books to `dest_root`. Returns the report and the state of each book."""
     library, dest_root = Path(library), Path(dest_root)
     inside = find_library_root(dest_root)
     if inside is not None:
@@ -212,8 +212,8 @@ def export_books(books: list[LibraryBook], library: Path, dest_root: Path,
                 records.append(_export_one(item))
                 item.status = Status.DONE
             report.done += 1
-        except Exception as exc:  # um livro com problema não para o lote
-            logger.exception("Falha ao exportar %s", item.book.title)
+        except Exception as exc:  # a book with a problem does not stop the batch
+            logger.exception("Failed to export %s", item.book.title)
             item.status, item.message = Status.FAILED, str(exc) or type(exc).__name__
             report.failed += 1
             report.errors.append(f"{item.book.title}: {item.message}")

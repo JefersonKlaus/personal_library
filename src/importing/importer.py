@@ -1,8 +1,8 @@
-"""Importar: coloca os PDFs revisados na biblioteca (a mesma da Galeria).
+"""Import: puts the reviewed PDFs into the library (the same one as the Gallery).
 
-Cada livro é preparado numa pasta temporária (`Título - Autor.pdf` + `.opf` de mesmo
-nome + capa) e adicionado pela ferramenta da biblioteca, que lê todos os metadados
-do OPF. Os ids criados ficam registrados para "Desfazer última importação".
+Each book is prepared in a temporary folder (`Título - Autor.pdf` + `.opf` with the
+same name + cover) and added by the library tool, which reads all the metadata from
+the OPF. The created ids are recorded for "Desfazer última importação".
 """
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from .analysis import book_key, entry_key
 from ..core.files import copy_verified
+from ..core.models import BookEntry, ImportOptions, Status
+from ..core.paths import IMPORTS_DIR
+from ..core.text import book_stem
 from ..library.cli import AddResult, LibraryCli
 from ..library.database import LibraryError, load_library
 from ..library.opf import OpfData, render_opf
-from ..core.models import BookEntry, ImportOptions, Status
-from ..core.paths import IMPORTS_DIR
 from ..pdf.pdf_cover import render_cover
-from ..core.text import book_stem
+from .analysis import book_key, entry_key
 
 logger = logging.getLogger(__name__)
 ProgressFn = Callable[[int, int, str], None]
@@ -31,7 +31,7 @@ ProgressFn = Callable[[int, int, str], None]
 
 @dataclass
 class ImportReport:
-    """Resultado de uma importação."""
+    """Result of an import."""
 
     total: int = 0
     added: int = 0
@@ -57,7 +57,7 @@ def import_books(entries: list[BookEntry], library: Path, options: ImportOptions
                  cli: LibraryCli, progress: ProgressFn | None = None,
                  cancel: threading.Event | None = None,
                  records_dir: Path = IMPORTS_DIR) -> ImportReport:
-    """Adiciona os livros marcados à biblioteca e atualiza a situação de cada um."""
+    """Adds the ticked books to the library and updates the state of each one."""
     library = Path(library)
     todo = [entry for entry in entries if entry.usable]
     report = ImportReport(total=len(todo))
@@ -84,12 +84,12 @@ def _import_one(entry: BookEntry, folder: Path, library: Path, options: ImportOp
     tags = list(dict.fromkeys([*options.tags, *entry.tags]))
     try:
         book_file, cover = stage_book(entry, folder, tags)
-    except Exception as exc:  # arquivo sumiu, mudou ou disco cheio: só este livro falha
-        logger.exception("Falha ao preparar %s", entry.source)
+    except Exception as exc:  # file gone, changed or disk full: only this book fails
+        logger.exception("Failed to prepare %s", entry.source)
         _record_result(entry, AddResult(False, message=str(exc) or type(exc).__name__), report)
         return
-    # A biblioteca compara só título + autor e recusaria o volume 2 de uma coleção;
-    # volumes já foram conferidos por título + autor + série + volume (acima).
+    # The library compares title + author only and would refuse volume 2 of a collection;
+    # volumes were already checked by title + author + series + volume (above).
     allow_duplicate = not options.skip_duplicates or entry.is_volume
     result = cli.add_book(library, book_file, entry, tags, cover, allow_duplicate)
     _record_result(entry, result, report)
@@ -111,12 +111,12 @@ def _record_result(entry: BookEntry, result: AddResult, report: ImportReport) ->
 
 
 def stage_book(entry: BookEntry, folder: Path, tags: list[str]) -> tuple[Path, Path | None]:
-    """Prepara o livro numa pasta: cópia verificada do PDF, capa (1ª página) e OPF."""
+    """Prepares the book in a folder: verified copy of the PDF, cover (1st page) and OPF."""
     folder.mkdir(parents=True, exist_ok=True)
     book_file = folder / f"{book_stem(entry.title, entry.author)}.pdf"
     copy_verified(entry.source, book_file, entry.sha256 or None)
     cover = folder / "cover.jpg"
-    # Com o OPF a biblioteca não gera capa sozinha, então ela vai pronta.
+    # With the OPF the library does not build a cover on its own, so it goes ready-made.
     has_cover = render_cover(book_file, cover)
     opf = render_opf(entry_opf_data(entry, tags), cover.name if has_cover else None)
     book_file.with_suffix(".opf").write_text(opf, encoding="utf-8")
@@ -124,9 +124,9 @@ def stage_book(entry: BookEntry, folder: Path, tags: list[str]) -> tuple[Path, P
 
 
 def entry_opf_data(entry: BookEntry, tags: list[str]) -> OpfData:
-    """Metadados de um PDF revisado na aba Importar."""
-    # Meio-dia UTC: a data é mostrada no fuso local, e meia-noite UTC viraria
-    # "dez. do ano anterior" no Brasil (UTC-3).
+    """Metadata of a PDF reviewed in the Import tab."""
+    # Noon UTC: the date is shown in the local time zone, and midnight UTC would become
+    # "Dec of the previous year" in Brazil (UTC-3).
     pubdate = f"{entry.year:04d}-01-01T12:00:00+00:00" if entry.year else ""
     return OpfData(
         title=entry.title, authors=entry.authors or [entry.author],
@@ -137,7 +137,7 @@ def entry_opf_data(entry: BookEntry, tags: list[str]) -> OpfData:
 
 
 def skip_volumes_already_in(library: Path, entries: list[BookEntry]) -> int:
-    """Marca os volumes que a biblioteca já tem (título + autor + série + volume)."""
+    """Marks the volumes the library already has (title + author + series + volume)."""
     volumes = [entry for entry in entries if entry.is_volume]
     if not volumes:
         return 0
@@ -145,7 +145,7 @@ def skip_volumes_already_in(library: Path, entries: list[BookEntry]) -> int:
         existing = {book_key(b.title, b.authors, b.series, b.series_index)
                     for b in load_library(library)}
     except LibraryError as exc:
-        logger.warning("Não foi possível conferir duplicados em %s: %s", library, exc)
+        logger.warning("Could not check duplicates in %s: %s", library, exc)
         return 0
     skipped = 0
     for entry in volumes:
@@ -155,7 +155,7 @@ def skip_volumes_already_in(library: Path, entries: list[BookEntry]) -> int:
     return skipped
 
 
-# ---------------------------------------------------------------- desfazer
+# ---------------------------------------------------------------- undo
 
 def write_import_record(folder: Path, library: Path, ids: list[int], titles: list[str]) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
@@ -167,7 +167,7 @@ def write_import_record(folder: Path, library: Path, ids: list[int], titles: lis
 
 
 def latest_import(library: Path, folder: Path = IMPORTS_DIR) -> Path | None:
-    """Última importação ainda não desfeita nesta biblioteca."""
+    """Latest import in this library that was not undone yet."""
     if not folder.is_dir():
         return None
     target = str(Path(library).resolve())
@@ -183,9 +183,9 @@ def latest_import(library: Path, folder: Path = IMPORTS_DIR) -> Path | None:
 
 
 def undo_import(record: Path, cli: LibraryCli) -> tuple[int, str]:
-    """Remove os livros da importação (vão para a lixeira da biblioteca).
+    """Removes the books of the import (they go to the library recycle bin).
 
-    Devolve (quantos, mensagem de erro ou "").
+    Returns (how many, error message or "").
     """
     data = json.loads(Path(record).read_text(encoding="utf-8"))
     ids = [int(book_id) for book_id in data.get("ids", [])]

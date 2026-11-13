@@ -1,4 +1,4 @@
-"""Onde estão as bibliotecas: validar uma pasta, achar as conhecidas e onde criar uma nova."""
+"""Where the libraries are: validating a folder, finding the known ones and where to create a new one."""
 from __future__ import annotations
 
 import json
@@ -12,19 +12,19 @@ from .manager import (CONFIG_DIR_ENV, CONFIG_DIR_NAME, CURRENT_LIBRARY_FILE,
 
 
 def is_library(path: Path | str) -> bool:
-    """Uma biblioteca sempre tem o banco de dados na raiz."""
+    """A library always has the database at its root."""
     return bool(path) and (Path(path) / DATABASE_FILE).is_file()
 
 
 def find_library_root(path: Path | str) -> Path | None:
-    """A biblioteca que contém `path` (ele mesmo ou uma pasta acima), se houver."""
+    """The library that contains `path` (itself or a folder above), if any."""
     current = Path(path).expanduser().absolute()
     return next((folder for folder in (current, *current.parents) if is_library(folder)), None)
 
 
 def find_library_in(folder: Path | str) -> Path | None:
-    """A própria pasta, se for biblioteca, ou a única biblioteca logo dentro dela
-    (quem escolhe a pasta de cima em vez da pasta da biblioteca)."""
+    """The folder itself, if it is a library, or the only library just inside it
+    (for whoever picks the folder above instead of the library folder)."""
     folder = Path(folder)
     if is_library(folder):
         return folder
@@ -36,8 +36,8 @@ def find_library_in(folder: Path | str) -> Path | None:
 
 
 def new_library_path(parent: Path | str) -> Path:
-    """Onde criar a biblioteca: a própria pasta, se estiver vazia, ou uma subpasta
-    com o nome padrão (uma biblioteca nova precisa de uma pasta vazia)."""
+    """Where to create the library: the folder itself, if it is empty, or a subfolder
+    with the default name (a new library needs an empty folder)."""
     parent = Path(parent)
     if not parent.exists() or (parent.is_dir() and not any(parent.iterdir())):
         return parent
@@ -49,7 +49,7 @@ def new_library_path(parent: Path | str) -> Path:
 
 
 def manager_config_dir() -> Path:
-    """Pasta de configuração do programa dono da biblioteca (mesma regra que ele usa)."""
+    """Configuration folder of the program that owns the library (same rule it uses)."""
     custom = os.environ.get(CONFIG_DIR_ENV)
     if custom:
         return Path(custom)
@@ -69,8 +69,8 @@ def _read_json(path: Path) -> dict:
 
 
 def known_libraries(config_dir: Path | None = None) -> list[Path]:
-    """Bibliotecas que este computador já usa (a atual primeiro, depois as mais usadas
-    e a pasta padrão). Só devolve as que existem de verdade."""
+    """Libraries this computer already uses (the current one first, then the most used
+    and the default folder). Only returns the ones that really exist."""
     folder = config_dir or manager_config_dir()
     candidates: list[str] = []
     current = _read_json(folder / CURRENT_LIBRARY_FILE).get(CURRENT_LIBRARY_KEY)

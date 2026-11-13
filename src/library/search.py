@@ -1,4 +1,4 @@
-"""Busca e ordem dos livros da biblioteca (galeria e exportação)."""
+"""Search and order of the library books (gallery and export)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -6,7 +6,7 @@ from datetime import datetime
 from ..core.text import fold
 from .database import LibraryBook
 
-NO_SERIES = ""  # filtro "Sem série" (None = todos os livros)
+NO_SERIES = ""  # "Sem série" filter (None = every book)
 
 SORTS = {
     "added": "Mais recentes",
@@ -23,7 +23,7 @@ def _haystack(book: LibraryBook) -> str:
 
 
 def search(books: list[LibraryBook], query: str) -> list[LibraryBook]:
-    """Todas as palavras da busca precisam aparecer em título, autor, etiqueta, série ou editora."""
+    """Every word of the search has to appear in title, author, tag, series or publisher."""
     words = fold(query).split()
     if not words:
         return list(books)
@@ -31,16 +31,16 @@ def search(books: list[LibraryBook], query: str) -> list[LibraryBook]:
 
 
 def sort_books(books: list[LibraryBook], key: str) -> list[LibraryBook]:
-    """Ordena por 'added' (padrão), 'title', 'series', 'author' ou 'pubdate'."""
+    """Sorts by 'added' (default), 'title', 'series', 'author' or 'pubdate'."""
     oldest = datetime.min
 
     def naive(value: datetime | None) -> datetime:
         return value.replace(tzinfo=None) if value else oldest
 
-    if key == "title":  # mesmo título (volumes): em ordem de volume
+    if key == "title":  # same title (volumes): in volume order
         return sorted(books, key=lambda b: (fold(b.title_sort or b.title), fold(b.series),
                                             b.series_index))
-    if key == "series":  # volumes em ordem (1, 2, ... 18); livros sem série no fim
+    if key == "series":  # volumes in order (1, 2, ... 18); books without a series at the end
         return sorted(books, key=lambda b: (not b.series, fold(b.series), b.series_index,
                                             fold(b.title_sort or b.title)))
     if key == "author":
@@ -51,7 +51,7 @@ def sort_books(books: list[LibraryBook], key: str) -> list[LibraryBook]:
 
 
 def series_counts(books: list[LibraryBook]) -> list[tuple[str, int]]:
-    """Séries da biblioteca e quantos livros cada uma tem, em ordem alfabética."""
+    """Series of the library and how many books each one has, in alphabetical order."""
     counts: dict[str, int] = {}
     for book in books:
         if book.series:
@@ -60,7 +60,7 @@ def series_counts(books: list[LibraryBook]) -> list[tuple[str, int]]:
 
 
 def in_series(books: list[LibraryBook], series: str | None) -> list[LibraryBook]:
-    """Livros de uma série; None = todos; NO_SERIES = só os que não têm série."""
+    """Books of a series; None = all; NO_SERIES = only those without a series."""
     if series is None:
         return list(books)
     return [book for book in books if book.series == series]

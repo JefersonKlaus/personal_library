@@ -1,11 +1,11 @@
-"""Nomes de pessoas: reconhecer autores, separar vários e a forma de ordenação."""
+"""Person names: recognising authors, splitting several and the sort form."""
 from __future__ import annotations
 
 import re
 
 from ..core.text import normalize_text
 
-# Palavras minúsculas aceitas dentro de nomes de pessoas.
+# Lower-case words accepted inside person names.
 _PARTICLES = {
     "de", "da", "do", "dos", "das", "del", "della", "di", "du",
     "van", "von", "der", "den", "la", "le", "el", "bin", "ibn", "al",
@@ -19,7 +19,7 @@ _CORPORATE = re.compile(
 
 
 def looks_like_person(text: str) -> bool:
-    """Heurística: 1 a 5 palavras capitalizadas, sem números."""
+    """Heuristic: 1 to 5 capitalised words, no digits."""
     words = text.replace(".", ". ").split()
     if not 1 <= len(words) <= 5 or len(text) > 60:
         return False
@@ -38,10 +38,10 @@ _PEOPLE_SEPARATOR = re.compile(r"\s*;\s*|\s+&\s+|\s+and\s+|\s+e\s+", re.I)
 
 
 def author_score(text: str) -> int:
-    """Quanto o texto parece ser autor(es): 2 = várias pessoas, 1 = uma, 0 = não.
+    """How much the text looks like author(s): 2 = several people, 1 = one, 0 = no.
 
-    "Ana Lima e Rui Dias" vale 2. Cada nome precisa ter 2+ palavras, senão
-    títulos como "Guerra e Paz" ou "Romeu & Julieta" passariam por autores.
+    "Ana Lima e Rui Dias" scores 2. Each name needs 2+ words, otherwise
+    titles such as "Guerra e Paz" or "Romeu & Julieta" would pass as authors.
     """
     parts = [part for part in _PEOPLE_SEPARATOR.split(text) if part.strip()]
     if len(parts) >= 2 and all(len(part.split()) >= 2 and looks_like_person(part)
@@ -51,7 +51,7 @@ def author_score(text: str) -> int:
 
 
 def display_name(name: str) -> str:
-    """'Silva, João' -> 'João Silva'. Outros nomes ficam como estão."""
+    """'Silva, João' -> 'João Silva'. Other names are left as they are."""
     name = normalize_text(name)
     if name.count(",") == 1:
         last, first = (part.strip() for part in name.split(","))
@@ -62,7 +62,7 @@ def display_name(name: str) -> str:
 
 
 def split_authors(raw: str) -> list[str]:
-    """Separa vários autores ('A; B', 'A & B', 'A and B', 'Ana Lima e Rui Dias')."""
+    """Splits several authors ('A; B', 'A & B', 'A and B', 'Ana Lima e Rui Dias')."""
     raw = normalize_text(raw)
     if not raw:
         return []
@@ -77,7 +77,7 @@ def split_authors(raw: str) -> list[str]:
 
 
 def author_sort(name: str) -> str:
-    """Forma de ordenação: 'João da Silva' -> 'Silva, João da'."""
+    """Sort form: 'João da Silva' -> 'Silva, João da'."""
     name = normalize_text(name)
     if not name or "," in name or _CORPORATE.search(name):
         return name

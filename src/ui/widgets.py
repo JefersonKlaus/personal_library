@@ -1,11 +1,11 @@
-"""Peças de interface reutilizadas pelas abas."""
+"""Interface pieces reused by the tabs."""
 from __future__ import annotations
 
 import flet as ft
 
 from ..core.models import Status
 
-TAB_IMPORT, TAB_GALLERY, TAB_EXPORT = range(3)  # ordem das abas na janela
+TAB_IMPORT, TAB_GALLERY, TAB_EXPORT = range(3)  # order of the tabs in the window
 
 STATUS_COLORS = {
     Status.READY: ft.Colors.GREEN_700,
@@ -30,7 +30,7 @@ def format_size(size: int) -> str:
 
 
 def section(title: str, *controls: ft.Control, expand: bool = False) -> ft.Container:
-    """Bloco com título, usado para agrupar cada etapa da tela."""
+    """Block with a heading, used to group each step of the screen."""
     return ft.Container(
         content=ft.Column(controls=[ft.Text(title, weight=ft.FontWeight.BOLD), *controls],
                           spacing=8, expand=expand,
@@ -39,7 +39,7 @@ def section(title: str, *controls: ft.Control, expand: bool = False) -> ft.Conta
 
 
 def option_grid(*controls: ft.Control) -> ft.ResponsiveRow:
-    """Opções lado a lado (Row com wrap empilha as caixas no Flet 1.0)."""
+    """Options side by side (a Row with wrap stacks the boxes in Flet 1.0)."""
     return ft.ResponsiveRow(
         controls=[ft.Container(content=c, col={"xs": 12, "md": 6, "lg": 3}) for c in controls],
         spacing=4, run_spacing=0)
@@ -52,7 +52,7 @@ def pager_controls(on_prev, on_next) -> tuple[ft.OutlinedButton, ft.Text, ft.Out
 
 def update_pager(prev: ft.Control, label: ft.Text, next_: ft.Control, index: int,
                  pages: int) -> None:
-    """Mostra 'Página x de y' e só exibe os botões quando há mais de uma página."""
+    """Shows 'Página x de y' and only displays the buttons when there is more than one page."""
     label.value = f"Página {index + 1} de {pages}"
     prev.disabled, next_.disabled = index == 0, index >= pages - 1
     for control in (prev, label, next_):

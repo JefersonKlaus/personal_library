@@ -1,22 +1,22 @@
-"""Como importar: o padrão do nome dos arquivos e os valores fixos.
+"""The "Como importar" setting: the pattern of the file names and the fixed values.
 
-Exemplo: "@name - @vol - @auth" ou "@name - @vol; @auth=ONE".
+Example: "@name - @vol - @auth" or "@name - @vol; @auth=ONE".
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
-from .filename_parser import ParsedName, automatic_values, compose
 from ..core.text import extract_year, normalize_text, strip_noise
-from .volumes import VOL_NUMBER, VOL_TRAILING, VOL_WORD, match_volume
+from .filename_parser import ParsedName, automatic_values, compose
+from .volumes import VOL_NUMBER, VOL_TRAILING, VOL_WORD, looks_like_volume, match_volume
 
 
 class PatternError(ValueError):
-    """Configuração de importação inválida (mensagem pronta para mostrar)."""
+    """Invalid import configuration (message ready to be shown)."""
 
 
-# Parâmetros aceitos (@nome) e o campo que cada um preenche.
+# Accepted parameters (@name) and the field each one fills in.
 PARAMETERS = {
     "name": "title", "nome": "title", "title": "title", "titulo": "title", "título": "title",
     "vol": "volume", "volume": "volume",
@@ -53,10 +53,10 @@ PATTERN_HELP = (
 
 @dataclass
 class ImportSpec:
-    """O que o usuário escreveu em "Como importar": padrão do nome e valores fixos.
+    """What the user wrote in "Como importar": name pattern and fixed values.
 
-    `fields[i]` é o campo da i-ésima parte do nome; `separators[i]` é o texto
-    (delimitador) antes dela, e o último separador sobra no fim.
+    `fields[i]` is the field of the i-th part of the name; `separators[i]` is the text
+    (delimiter) before it, and the last separator is left over at the end.
     """
 
     text: str
@@ -78,7 +78,7 @@ class ImportSpec:
         return rf"\s+{chars}\s+" if strict else rf"\s*{chars}\s*"
 
     def regex(self, count: int, strict: bool) -> re.Pattern:
-        """Regex com as `count` primeiras partes (as do fim podem faltar no arquivo)."""
+        """Regex with the first `count` parts (the trailing ones may be missing in the file)."""
         pieces = ["^", self._separator_regex(self.separators[0], strict, edge=True)]
         for index in range(count):
             if index:
@@ -91,7 +91,7 @@ class ImportSpec:
 
 
 def _legacy_to_parameters(text: str) -> str:
-    """'NOME - VOL - AUTOR' (versão anterior) -> '@name - @vol - @auth'."""
+    """'NOME - VOL - AUTOR' (earlier version) -> '@name - @vol - @auth'."""
     return re.sub(r"\*|[^\W\d_]+",
                   lambda m: _LEGACY.get(m.group(0).upper(), m.group(0))
                   if m.group(0).isupper() or m.group(0) == "*" else m.group(0), text)
@@ -116,7 +116,7 @@ def _param_name(field_name: str) -> str:
 
 
 def compile_spec(text: str) -> ImportSpec | None:
-    """Interpreta "Como importar"; vazio = automático (None). Levanta PatternError."""
+    """Parses "Como importar"; empty = automatic (None). Raises PatternError."""
     text = normalize_text(text or "")
     if not text:
         return None
@@ -155,13 +155,13 @@ def compile_spec(text: str) -> ImportSpec | None:
                                    "(ex.: @name - @auth).")
             spec.separators.append(separator)
             spec.fields.append(name)
-            if match.group("value") is not None:  # "@auth=ONE" no meio do padrão
+            if match.group("value") is not None:  # "@auth=ONE" in the middle of the pattern
                 spec.fixed[name] = _check_fixed(name, match.group("value"))
             literal, position = "", match.end()
         spec.separators.append(literal + segment[position:])
         if not spec.fields:
             raise PatternError("O padrão precisa de parâmetros, ex.: @name - @vol.")
-    # Um separador do padrão não pode ter sido cortado pelo ';' (ex.: "@name -; @auth=x").
+    # A separator of the pattern cannot have been cut by the ';' (e.g. "@name -; @auth=x").
     named = [f for f in spec.fields if f != "skip"]
     if len(named) != len(set(named)):
         raise PatternError("Cada parâmetro (@name, @vol, @auth...) só pode aparecer uma vez.")
@@ -172,9 +172,9 @@ def compile_spec(text: str) -> ImportSpec | None:
 
 
 def _swallowed_separator(spec: ImportSpec, found: re.Match, count: int) -> bool:
-    """Num match encurtado (partes do fim faltando), a última parte capturada não
-    pode conter o delimitador da parte seguinte: isso indica que o arquivo tinha
-    mais partes, só que fora do padrão."""
+    """In a shortened match (trailing parts missing), the last captured part cannot
+    contain the delimiter of the next part: that means the file had more parts,
+    only not following the pattern."""
     core = spec.separators[count].strip()
     if not core:
         return False
@@ -184,7 +184,7 @@ def _swallowed_separator(spec: ImportSpec, found: re.Match, count: int) -> bool:
 
 
 def _match_pattern(stem: str, spec: ImportSpec) -> dict[str, str] | None:
-    """Partes do nome segundo o padrão; None se o arquivo não segue o padrão."""
+    """Parts of the name according to the pattern; None if the file does not follow it."""
     text = strip_noise(normalize_text(stem))
     values: dict[str, str] = {}
     if "year" not in spec.fields:
@@ -192,7 +192,7 @@ def _match_pattern(stem: str, spec: ImportSpec) -> dict[str, str] | None:
         text = strip_noise(text)
         if year:
             values["year"] = str(year)
-    # As partes do fim podem faltar, mas o título tem de vir do nome (ou ser fixo).
+    # The trailing parts may be missing, but the title has to come from the name (or be fixed).
     needs = {"title", "series"} if "title" not in spec.fixed else set()
     found = None
     for count in range(len(spec.fields), 0, -1):
@@ -201,7 +201,7 @@ def _match_pattern(stem: str, spec: ImportSpec) -> dict[str, str] | None:
         for strict in (True, False):
             found = spec.regex(count, strict).match(text)
             if found and count < len(spec.fields) and _swallowed_separator(spec, found, count):
-                found = None  # "Dom Casmurro - Machado" não é "@name" sem o resto
+                found = None  # "Dom Casmurro - Machado" is not "@name" without the rest
             if found:
                 break
         if found:
@@ -213,7 +213,7 @@ def _match_pattern(stem: str, spec: ImportSpec) -> dict[str, str] | None:
         if value and field_name != "skip":
             values[field_name] = value
     if "volume" in spec.fields and "volume" not in values and values.get("title"):
-        # O padrão tem @vol, mas este arquivo não separou: "Naruto v03", "Berserk Vol. 41".
+        # The pattern has @vol, but this file did not separate it: "Naruto v03", "Berserk Vol. 41".
         trailing = VOL_TRAILING.search(values["title"])
         if trailing and trailing.start() > 0:
             values["volume"] = trailing.group(0).strip()
@@ -223,10 +223,10 @@ def _match_pattern(stem: str, spec: ImportSpec) -> dict[str, str] | None:
 
 def apply_spec(stem: str, spec: ImportSpec | None,
                author_first: bool = True) -> tuple[ParsedName, bool]:
-    """Lê o nome do arquivo segundo "Como importar".
+    """Reads the file name according to "Como importar".
 
-    Devolve (resultado, seguiu_o_padrão). Sem padrão (ou fora dele) usa o modo
-    automático. Os valores fixos (@auth=ONE) valem para todos os arquivos.
+    Returns (result, followed_the_pattern). With no pattern (or outside it) the automatic
+    mode is used. The fixed values (@auth=ONE) apply to every file.
     """
     values = _match_pattern(stem, spec) if spec is not None and spec.has_pattern else None
     matched = values is not None
@@ -235,3 +235,39 @@ def apply_spec(stem: str, spec: ImportSpec | None,
     if spec is not None:
         values.update(spec.fixed)
     return compose(values), matched or spec is None or not spec.has_pattern
+
+
+@dataclass
+class PatternPreview:
+    """How "Como importar" reads one file name, in words (the example line of the tab)."""
+
+    text: str
+    ok: bool  # followed the pattern and nothing looks misplaced (a volume as the author)
+
+
+def describe_pattern(name: str, spec: ImportSpec | None, author_first: bool) -> PatternPreview:
+    """Reads `name` with the pattern and says what went where, marking fixed values and
+    values that look like a volume in the wrong field."""
+    parsed, matched = apply_spec(name, spec, author_first)
+    fixed = spec.fixed if spec is not None else {}
+
+    def mark(field_name: str, value: str = "") -> str:
+        if looks_like_volume(value):
+            return " (parece um volume: use @vol)"
+        return " (fixo)" if field_name in fixed else ""
+
+    parts = [f"Título: {parsed.title}{mark('title', parsed.title)}",
+             f"Autor: {parsed.author or '—'}{mark('author', parsed.author)}"]
+    if parsed.series_index is not None:
+        parts.append(f"Vol.: {parsed.series_index:g}{mark('volume')}")
+    if parsed.series:
+        origin = " (de @name: a biblioteca só guarda o volume dentro de uma série)" \
+            if parsed.series_from_name else mark("series")
+        parts.append(f"Série: {parsed.series}{origin}")
+    for field_name, value in (("year", parsed.year), ("publisher", parsed.publisher),
+                              ("language", parsed.language), ("tags", ", ".join(parsed.tags))):
+        if value:
+            parts.append(f"{FIELD_LABELS[field_name]}: {value}{mark(field_name)}")
+    prefix = f"«{name}» → " if matched else f"«{name}» não segue o padrão; no automático → "
+    suspicious = looks_like_volume(parsed.author) or looks_like_volume(parsed.title)
+    return PatternPreview(prefix + " · ".join(parts), matched and not suspicious)

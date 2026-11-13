@@ -1,8 +1,8 @@
-"""Ferramenta de linha de comando da biblioteca: adicionar, alterar, remover e criar.
+"""Command line tool of the library: add, change, remove and create.
 
-Só o próprio programa da biblioteca pode alterá-la (ele mantém o banco de dados);
-o app nunca escreve na pasta da biblioteca. Enquanto outro programa estiver usando
-uma biblioteca, a ferramenta recusa o acesso (para não corromper o banco).
+Only the library program itself may change it (it owns the database); the app never
+writes inside the library folder. While another program is using a library, the tool
+refuses access (so the database is not corrupted).
 """
 from __future__ import annotations
 
@@ -24,16 +24,16 @@ LIBRARY_IN_USE = ("A biblioteca está sendo usada por outro programa (por exempl
 
 @dataclass
 class AddResult:
-    """Resultado de adicionar um livro."""
+    """Result of adding a book."""
 
     ok: bool
     book_ids: list[int] = field(default_factory=list)
     message: str = ""
-    duplicate: bool = False  # a biblioteca já tinha um livro com o mesmo título e autor
+    duplicate: bool = False  # the library already had a book with the same title and author
 
 
 def find_cli(custom: str | None = None) -> Path | None:
-    """Procura o executável (caminho informado, PATH e pastas de instalação comuns)."""
+    """Looks for the executable (given path, PATH and common installation folders)."""
     candidates: list[Path] = []
     if custom:
         given = Path(custom)
@@ -49,8 +49,8 @@ def find_cli(custom: str | None = None) -> Path | None:
 def add_command(executable: Path, library: Path, book_file: Path, entry: BookEntry,
                 tags: list[str], cover: Path | None = None,
                 allow_duplicate: bool = False) -> list[str]:
-    """Monta o comando 'add'. Usa `--opção=valor` para que um título começando com '-'
-    não seja confundido com uma opção."""
+    """Builds the 'add' command. Uses `--option=value` so that a title starting with '-'
+    is not mistaken for an option."""
     command = [str(executable), "add", "--with-library", str(library)]
     if allow_duplicate:
         command.append("--duplicates")
@@ -68,14 +68,14 @@ def add_command(executable: Path, library: Path, book_file: Path, entry: BookEnt
 
 
 def parse_added_ids(output: str) -> list[int]:
-    """Lê os ids informados em 'Added book ids: 12, 13'."""
+    """Reads the ids reported in 'Added book ids: 12, 13'."""
     match = _ADDED_IDS.search(output)
     return [int(item) for item in re.findall(r"\d+", match.group(1))] if match else []
 
 
 def _error_message(output: str) -> str:
-    """Mensagem para o usuário. Biblioteca em uso vira uma explicação clara, em vez da
-    última linha (técnica, em inglês) da saída da ferramenta."""
+    """Message for the user. A library in use becomes a clear explanation, instead of the
+    last line (technical, in English) of the tool output."""
     output = output.strip()
     if "running" in output.lower():
         return LIBRARY_IN_USE
@@ -83,7 +83,7 @@ def _error_message(output: str) -> str:
 
 
 class LibraryCli:
-    """Executa a ferramenta de linha de comando da biblioteca."""
+    """Runs the command line tool of the library."""
 
     def __init__(self, executable: Path, timeout: int = 300) -> None:
         self.executable = Path(executable)
@@ -96,9 +96,9 @@ class LibraryCli:
 
     def _run(self, args: list[str]) -> subprocess.CompletedProcess[str]:
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
-        # A ferramenta traduz as mensagens para o idioma do programa ("IDs de livro
-        # adicionados: 12"); em inglês a leitura de "Added book ids" é confiável. Saída
-        # decodificada com "replace": um título acentuado não pode derrubar a importação.
+        # The tool translates the messages to the language of the program ("IDs de livro
+        # adicionados: 12"); in English, reading "Added book ids" is reliable. Output
+        # decoded with "replace": an accented title must not bring the import down.
         env = {**os.environ, LANGUAGE_ENV: "en", "PYTHONIOENCODING": "utf-8"}
         return subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=self.timeout, check=False,
@@ -106,8 +106,9 @@ class LibraryCli:
 
     def add_book(self, library: Path, book_file: Path, entry: BookEntry, tags: list[str],
                  cover: Path | None = None, allow_duplicate: bool = False) -> AddResult:
-        """Adiciona um livro. Os metadados que não cabem na linha de comando (ordenação,
-        data, editora) a ferramenta lê do OPF de mesmo nome ao lado de `book_file`."""
+        """Adds a book. The metadata that does not fit on the command line (sort name,
+        date, publisher) is read by the tool from the OPF with the same name next to
+        `book_file`."""
         command = add_command(self.executable, library, book_file, entry, tags, cover,
                               allow_duplicate)
         try:
@@ -123,7 +124,7 @@ class LibraryCli:
         return AddResult(False, message=_error_message(output))
 
     def remove_books(self, library: Path, ids: list[int]) -> tuple[bool, str]:
-        """Remove livros (vão para a lixeira da biblioteca). Devolve (ok, erro)."""
+        """Removes books (they go to the library recycle bin). Returns (ok, error)."""
         if not ids:
             return True, ""
         command = [str(self.executable), "remove", "--with-library", str(library),
@@ -136,9 +137,9 @@ class LibraryCli:
             False, _error_message(f"{done.stdout}\n{done.stderr}"))
 
     def set_fields(self, library: Path, book_id: int, fields: dict[str, str]) -> tuple[bool, str]:
-        """Altera campos de um livro (ex.: {'title': ..., 'sort': ...}). Devolve (ok, erro).
+        """Changes fields of a book (e.g. {'title': ..., 'sort': ...}). Returns (ok, error).
 
-        Mudar o título também renomeia a pasta do livro; quem faz isso é a ferramenta.
+        Changing the title also renames the book folder; the tool is the one doing it.
         """
         command = [str(self.executable), "set_metadata", "--with-library", str(library)]
         command += [f"--field={name}:{value}" for name, value in fields.items()]
@@ -151,9 +152,10 @@ class LibraryCli:
             False, _error_message(f"{done.stdout}\n{done.stderr}"))
 
     def create_library(self, path: Path | str) -> tuple[bool, str]:
-        """Cria uma biblioteca vazia numa pasta vazia ou inexistente. Devolve (ok, erro).
+        """Creates an empty library in an empty or non-existing folder. Returns (ok, error).
 
-        Quem cria é a própria ferramenta, então o banco sai no formato da versão instalada.
+        The tool itself creates it, so the database comes in the format of the installed
+        version.
         """
         path = Path(path)
         if is_library(path):
@@ -173,6 +175,6 @@ class LibraryCli:
             if done.returncode == 0 and is_library(path):
                 return True, ""
             error = _error_message(f"{done.stdout}\n{done.stderr}")
-        if created:  # não deixa para trás a pasta que o app criou
+        if created:  # does not leave behind the folder the app created
             shutil.rmtree(path, ignore_errors=True)
         return False, error

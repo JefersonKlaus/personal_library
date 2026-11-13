@@ -1,4 +1,4 @@
-"""Leitura de PDFs: título, autor, idioma e páginas de dentro do arquivo."""
+"""Reading PDFs: title, author, language and pages from inside the file."""
 from __future__ import annotations
 
 import logging
@@ -33,20 +33,20 @@ _LANG_CODE = re.compile(r"^([A-Za-z]{2,3})(?:[-_]|$)")
 
 @dataclass
 class PdfInfo:
-    """O que foi possível ler de dentro do PDF."""
+    """What could be read from inside the PDF."""
 
     title: str = ""
     author: str = ""
     language: str | None = None
     pages: int = 0
     encrypted: bool = False
-    locked: bool = False  # exige senha
+    locked: bool = False  # needs a password
     readable: bool = True
     error: str = ""
 
 
 def is_junk_title(title: str) -> bool:
-    """Títulos automáticos de programas ('Microsoft Word - doc1', 'untitled')."""
+    """Automatic titles left by programs ('Microsoft Word - doc1', 'untitled')."""
     title = normalize_text(title)
     if len(title) < 2 or _JUNK_TITLE_EXACT.match(title):
         return True
@@ -54,7 +54,7 @@ def is_junk_title(title: str) -> bool:
 
 
 def is_junk_author(author: str) -> bool:
-    """Autores automáticos ('admin', 'Acrobat PDFMaker', e-mails)."""
+    """Automatic authors ('admin', 'Acrobat PDFMaker', e-mails)."""
     author = normalize_text(author)
     if len(author) < 2 or author.lower() in _JUNK_AUTHORS:
         return True
@@ -62,7 +62,7 @@ def is_junk_author(author: str) -> bool:
 
 
 def looks_like_pdf(path: Path) -> bool:
-    """Confere se há a assinatura '%PDF-' no início do arquivo."""
+    """Checks for the '%PDF-' signature at the start of the file."""
     try:
         with path.open("rb") as handle:
             return b"%PDF-" in handle.read(1024)
@@ -76,7 +76,7 @@ def _language_code(value: object) -> str | None:
 
 
 def read_pdf_info(path: Path) -> PdfInfo:
-    """Lê título, autor, idioma e número de páginas; nunca levanta exceção."""
+    """Reads title, author, language and page count; never raises."""
     info = PdfInfo()
     try:
         from pypdf import PdfReader
@@ -98,20 +98,20 @@ def read_pdf_info(path: Path) -> PdfInfo:
             info.author = normalize_text(str(meta.author or ""))
         try:
             info.language = _language_code(reader.trailer["/Root"].get("/Lang"))
-        except Exception:  # catálogo sem /Lang ou malformado: não é crítico
+        except Exception:  # catalog without /Lang or malformed: not critical
             info.language = None
-    except Exception as exc:  # pypdf levanta vários tipos para arquivos ruins
-        logger.warning("Falha ao ler %s: %s", path, exc)
+    except Exception as exc:  # pypdf raises several types for bad files
+        logger.warning("Failed to read %s: %s", path, exc)
         info.readable = False
         info.error = f"{type(exc).__name__}: {exc}"
     return info
 
 
 def first_pages_text(path: Path, pages: int = 3, max_chars: int = 2500) -> str:
-    """Texto das primeiras páginas (capa, folha de rosto, ficha catalográfica).
+    """Text of the first pages (cover, title page, copyright page).
 
-    Limitado para a consulta à IA ficar pequena. PDFs escaneados (só imagem) ou
-    protegidos devolvem "" e a IA usa só o nome do arquivo e os metadados.
+    Limited so that the query sent to the AI stays small. Scanned PDFs (image only) or
+    protected ones return "" and the AI works from the file name and metadata alone.
     """
     try:
         from pypdf import PdfReader
@@ -120,8 +120,8 @@ def first_pages_text(path: Path, pages: int = 3, max_chars: int = 2500) -> str:
         if reader.is_encrypted and not reader.decrypt(""):
             return ""
         text = "\n".join((page.extract_text() or "") for page in reader.pages[:pages])
-    except Exception as exc:  # arquivo ruim: a IA trabalha sem o texto
-        logger.info("Sem texto de %s: %s", path, exc)
+    except Exception as exc:  # bad file: the AI works without the text
+        logger.info("No text from %s: %s", path, exc)
         return ""
     text = re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", text)).strip()
     return text[:max_chars]

@@ -1,4 +1,4 @@
-"""Aba Exportar: copia livros da biblioteca aberta para outra pasta."""
+"""Exportar tab: copies books of the open library to another folder."""
 from __future__ import annotations
 
 import logging
@@ -7,16 +7,16 @@ from typing import TYPE_CHECKING, Any
 
 import flet as ft
 
-from ..exporting import exporter
 from ..core.files import latest_manifest, undo_manifest
-from ..library.database import LibraryBook
-from ..library.search import search
 from ..core.models import Status
 from ..core.settings import Settings
+from ..exporting import exporter
+from ..library.database import LibraryBook
+from ..library.search import search
 from .widgets import (STATUS_COLORS, TAB_GALLERY, page_count, pager_controls, section,
                       update_pager)
 
-if TYPE_CHECKING:  # só para o editor; evita import circular
+if TYPE_CHECKING:  # for the editor only; avoids a circular import
     from .app import PersonalLibraryApp
 
 logger = logging.getLogger(__name__)
@@ -25,13 +25,13 @@ PAGE_SIZE = 50
 
 
 class ExportTab:
-    """Seleção de livros da biblioteca, destino, formato e as ações de exportar."""
+    """Selection of library books, destination, layout and the export actions."""
 
     def __init__(self, app: "PersonalLibraryApp") -> None:
         self.app = app
         settings = app.settings
-        self.selected: set[int] = set()  # ids de livros marcados
-        self.results: dict[int, tuple[Status, str]] = {}  # resultado por id de livro
+        self.selected: set[int] = set()  # ids of ticked books
+        self.results: dict[int, tuple[Status, str]] = {}  # result by book id
         self.page_index = 0
         self._known_ids: set[int] = set()
         self.search_field = ft.TextField(
@@ -84,7 +84,7 @@ class ExportTab:
                 "A pasta exportada pode ser adicionada em outra biblioteca com 'Adicionar de "
                 "pastas e subpastas'.", size=11, color=ft.Colors.GREY_700)),
         ])
-        # Botões fora da rolagem: sempre visíveis, mesmo em janelas baixas.
+        # Buttons outside the scroll area: always visible, even in short windows.
         buttons = ft.Row(controls=[self.btn_dry, self.btn_export, self.btn_undo], spacing=8)
         right = ft.Column(width=460, spacing=10, controls=[settings, buttons])
         return ft.Container(padding=12, expand=True, content=ft.Row(
@@ -102,11 +102,11 @@ class ExportTab:
                                       write_opf=bool(self.cb_opf.value),
                                       include_cover=bool(self.cb_cover.value), dry_run=dry_run)
 
-    # ------------------------------------------------------------------ lista e seleção
+    # ------------------------------------------------------------------ list and selection
 
     def on_library_changed(self, changed: bool) -> None:
-        """Outra biblioteca: tudo marcado. A mesma recarregada: mantém a seleção e marca
-        os livros novos."""
+        """Another library: everything ticked. The same one reloaded: keeps the selection and
+        ticks the new books."""
         ids = {book.id for book in self.app.books}
         if changed:
             self.selected, self.results = set(ids), {}
@@ -146,7 +146,7 @@ class ExportTab:
         self.app.page.update()
 
     def select_all(self, value: bool) -> None:
-        """Marca/desmarca os livros do filtro atual (ou todos, sem filtro)."""
+        """Ticks/unticks the books of the current filter (or all of them, with no filter)."""
         ids = {book.id for book in self.visible_books()}
         self.selected = self.selected | ids if value else self.selected - ids
         self.refresh()
@@ -197,7 +197,7 @@ class ExportTab:
             self.app.save()
             self.app.page.update()
 
-    # ------------------------------------------------------------------ ações
+    # ------------------------------------------------------------------ actions
 
     async def on_dry_run(self, _event: Any) -> None:
         await self._export(dry_run=True)
@@ -223,7 +223,7 @@ class ExportTab:
                 exporter.export_books, books, self.app.library, Path(dest),
                 self.options(dry_run), label="Simulando" if dry_run else "Exportando")
         except Exception as exc:
-            logger.exception("Falha ao exportar")
+            logger.exception("Export failed")
             self.app.log(f"Erro ao exportar: {exc}", True)
             return
         for item in items:
@@ -232,8 +232,7 @@ class ExportTab:
                 self.results[item.book.id] = (Status.READY, f"iria para {target}")
             else:
                 self.results[item.book.id] = (item.status, item.message)
-        for error in report.errors[:20]:
-            self.app.log(f"  ✗ {error}", True)
+        self.app.log_errors(report.errors)
         if report.manifest:
             self.app.log(f"Registro para desfazer: {report.manifest}")
         verb = "seriam exportados" if dry_run else "exportados"
@@ -255,11 +254,10 @@ class ExportTab:
             report = await self.app.run_job(undo_manifest, manifest, label="Desfazendo",
                                             cancellable=False)
         except Exception as exc:
-            logger.exception("Falha ao desfazer")
+            logger.exception("Undo failed")
             self.app.log(f"Erro ao desfazer: {exc}", True)
             return
-        for error in report.errors[:20]:
-            self.app.log(f"  ✗ {error}", True)
+        self.app.log_errors(report.errors)
         self.app.log(f"Exportação desfeita: {report.done} de {report.total} livros.",
                      error=bool(report.failed))
         self.results.clear()

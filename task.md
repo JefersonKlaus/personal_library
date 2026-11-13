@@ -1,6 +1,14 @@
 0:20
 
 
+# FLAG
+1 | Intent disambiguation (understanding what you meant)
+It assumed I wanted translate ALL to english, like buttons and labels.
+It should only translate the variables, comments, files' names not the app's language.
+
+2 | Intent disambiguation (understanding what you meant)
+It assume it should open the PDF in the screen place.
+It sould open a modal (new window) only to show the book, and with control on the side to optimize the vertical size.
 
 ## Task
 The project is a desktop system that convert PDF to calibre app using python. At this case 'convert' means, create a file that Calibe uses to manage the books. 
@@ -21,7 +29,7 @@ Now the app has 234 tests, so, probably I will add more.
 
 ## How to test
 
-O ran the and i test it manually, adding PDFs, analyzing and reviwing the metadata, I created a new library and imported many PDFs. After I got a existent library and imported new books in there. Alfter that I ran pytest.
+I ran and I test it manually, adding PDFs, analyzing and reviwing the metadata, editing it, I created a new library and imported many PDFs. After I got a existent library and imported new books in there. So I open the PDF in the app to read the books and the entire flow works. Alfter that I ran pytest.
 
 SETUP:
 cd workspace/personal_library
@@ -34,7 +42,7 @@ ACTION: flet run
 RESULT: The app opened and I used it
 
 ACTION: pytest
-RESULT: 234 passed, 5 skipped in 12.7
+RESULT:  329 passed, 6 skipped
 
 
 O ran the and i test it manually, adding PDFs, analyzing and reviwing the metadata, I created a new library and imported many PDFs. After I got a existent library and imported new books in there. Alfter that I ran pytest.

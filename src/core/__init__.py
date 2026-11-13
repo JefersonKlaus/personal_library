@@ -1,1 +1,1 @@
-"""Base usada por todo o app: pastas, preferências, registro, modelo de dados, arquivos e texto."""
+"""Base used by the whole app: paths, settings, logging, data model, files and text."""
